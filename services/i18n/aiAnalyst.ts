@@ -1,0 +1,11 @@
+import { Translations } from './types';
+
+export const aiAnalyst: Translations = {
+    'ai_analyst_title': { es: 'Analista IA Logic', en: 'Logic AI Analyst', fr: 'Analyste IA Logic', de: 'Logic KI-Analyst', pt: 'Analista IA Logic', zh: 'Logic AI 分析师' },
+    'ai_welcome_msg': { es: '¡Hola! Soy tu Analista IA. He analizado la simulación actual. ¿En qué puedo ayudarte con los retrasos o la carga de máquinas?', en: 'Hello! I am your AI Analyst. I have analyzed the current simulation. How can I help you with delays or machine load?', fr: 'Bonjour ! Je suis votre Analyste IA. J\'ai analysé la simulation actuelle. Comment puis-je vous aider avec les retards ou la charge des machines ?', de: 'Hallo! Ich bin Ihr KI-Analyst. Ich habe die aktuelle Simulation analysiert. Wie kann ich Ihnen bei Verzögerungen oder der Maschinenauslastung helfen?', pt: 'Olá! Sou seu Analista IA. Analisei a simulación atual. Como posso ajudá-lo con atrasos ou carga de máquinas?', zh: '您好！我是您的 AI 分析师。我分析了当前的模拟。我该如何帮助您解决延迟或机器负载问题？' },
+    'ai_analyzing': { es: 'Analizando...', en: 'Analyzing...', fr: 'Analyse...', de: 'Analysieren...', pt: 'Analisando...', zh: '分析中...' },
+    'ai_online': { es: 'En línea y listo', en: 'Online and ready', fr: 'En ligne et prêt', de: 'Online und bereit', pt: 'Online e pronto', zh: '在线并准备就绪' },
+    'ai_placeholder': { es: 'Pregunta sobre la simulación...', en: 'Ask about the simulation...', fr: 'Posez une question sobre la simulación...', de: 'Fragen Sie nach der Simulation...', pt: 'Pergunte sobre a simulação...', zh: '询问有关模拟的问题...' },
+    'ai_support_tag': { es: 'IA Táctica de Soporte Operativo', en: 'Tactical Operational Support AI', fr: 'IA de Support Opérationnel Tactique', de: 'Taktische operative Unterstützungs-KI', pt: 'IA de Suporte Operacional Tático', zh: '战术运营支持 AI' },
+    'ai_error_msg': { es: 'Lo siento, hubo un error al procesar tu consulta. Por favor, intenta de nuevo.', en: 'Sorry, there was an error processing your request. Please try again.', fr: 'Désolé, une erreur s\'est produite lors del traitement de votre demande. Veuillez réessayer.', de: 'Entschuldigung, bei der Bearbeitung Ihrer Anfrage ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.', pt: 'Desculpe, houve um erro ao processar sua consulta. Por favor, tente novamente.', zh: '抱歉，处理您的请求时出现错误。请再试一次。' },
+};

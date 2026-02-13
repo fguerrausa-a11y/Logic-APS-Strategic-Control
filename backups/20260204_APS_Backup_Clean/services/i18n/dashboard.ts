@@ -1,0 +1,40 @@
+import { Translations } from './types';
+
+export const dashboard: Translations = {
+    'strategic_control': { es: 'Centro de Control Estratégico', en: 'Strategic Control Center', fr: 'Centre de Contrôle Stratégique', de: 'Strategisches Kontrollzentrum', pt: 'Centro de Controle Estratégico', zh: '战略控制中心' },
+    'global_overview': { es: 'Global Overview', en: 'Global Overview', fr: 'Vue d\'ensemble Globale', de: 'Globaler Überblick', pt: 'Visão Geral Global', zh: '全球概览' },
+    'ops_status': { es: 'Estado de Operaciones', en: 'Operations Status', fr: 'État des Opérations', de: 'Betriebsstatus', pt: 'Status das Operações', zh: '运营状态' },
+    'ops_monitoring': { es: 'Monitoreo táctico de recursos y demanda en tiempo real.', en: 'Tactical monitoring of resources and demand in real time.', fr: 'Suivi tactique des ressources et de la demanda en temps réel.', de: 'Taktische Überwachung von Ressourcen und Nachfrage en Echtzeit.', pt: 'Monitoramento tático de recursos e demanda em tiempo real.', zh: '实时资源和需求战术监控。' },
+    'network_load': { es: 'Carga de Red', en: 'Network Load', fr: 'Charge du Réseau', de: 'Netzwerklast', pt: 'Carga de Rede', zh: '网络负载' },
+    'capacity': { es: 'Capacidad', en: 'Capacity', fr: 'Capacité', de: 'Kapazität', pt: 'Capacidade', zh: '容量' },
+    'historical_performance': { es: 'Rendimiento Histórico', en: 'Historical Performance', fr: 'Performance Historique', de: 'Historische Leistung', pt: 'Desempenho Histórico', zh: '历史性能' },
+    'direct_traceability': { es: 'Trazabilidad Directa', en: 'Direct Traceability', fr: 'Traçabilité Directe', de: 'Direkte Rückverfolgbarkeit', pt: 'Rastreabilidade Direta', zh: '直接追溯' },
+    'oee_efficiency': { es: 'Eficiencia OEE', en: 'OEE Efficiency', fr: 'Efficacité OEE', de: 'OEE-Effizienz', pt: 'Eficiência OEE', zh: 'OEE 效率' },
+    'compliance': { es: 'Cumplimiento', en: 'Compliance', fr: 'Compliance', de: 'Einhaltung', pt: 'Conformidade', zh: '合规性' },
+    'active_delays': { es: 'Retrasos Activos', en: 'Active Delays', fr: 'Retards Actifs', de: 'Aktive Verzögerungen', pt: 'Atrasos Ativos', zh: '活动延迟' },
+    'operative_cost': { es: 'Costo Operativo', en: 'Operative Cost', fr: 'Coût Opérationnel', de: 'Betriebskosten', pt: 'Custo Operativo', zh: '运营成本' },
+    'scheduled_ops': { es: 'Planificadas', en: 'Scheduled', fr: 'Planifiées', de: 'Geplant', pt: 'Planejadas', zh: '已计划' },
+    'on_time': { es: 'A Tiempo', en: 'On Time', fr: 'À Temps', de: 'Pünktlich', pt: 'A Tiempo', zh: '按时' },
+    'deviation': { es: 'Desviación', en: 'Deviation', fr: 'Déviation', de: 'Abweichung', pt: 'Desvio', zh: '偏差' },
+    'root_cause': { es: 'Causa Raíz', en: 'Root Cause', fr: 'Cause Racine', de: 'Ursache', pt: 'Causa Raiz', zh: '根本原因' },
+    // Analytics
+    'intelligence_analytics': { es: 'Inteligencia Analítica', en: 'Intelligence Analytics', fr: 'Intelligence Analytique', de: 'Analytische Intelligenz', pt: 'Inteligência Analítica', zh: '智能分析' },
+    'mfg_analytics': { es: 'Manufacturing Analytics', en: 'Manufacturing Analytics', fr: 'Analyse de Fabrication', de: 'Fertigungsanalyse', pt: 'Análise de Manufatura', zh: '制造分析' },
+    'deep_analysis_desc': { es: 'Deep data analysis and predictive performance metrics.', en: 'Deep data analysis and predictive performance metrics.', fr: 'Analyse approfondie des données et mesures de performance prédictives.', de: 'Tiefgehende Datenanalyse und prädiktive Leistungskennzahlen.', pt: 'Análise profunda de datos e métricas de desempeño preditivo.', zh: '深度数据分析和预测性能指标。' },
+    'plant_performance': { es: 'Rendimiento de Planta', en: 'Plant Performance', fr: 'Performance de l\'Usine', de: 'Anlagenleistung', pt: 'Desempenho da Planta', zh: '工厂绩效' },
+    'planned': { es: 'Previsto', en: 'Planned', fr: 'Prévu', de: 'Geplant', pt: 'Previsto', zh: '计划' },
+    'real': { es: 'Real', en: 'Real', fr: 'Réel', de: 'Real', pt: 'Real', zh: '实际' },
+    'predictive_trend_chart': { es: 'Gráfica de Tendencia Predictiva', en: 'Predictive Trend Chart', fr: 'Graphique de Tendance Prédictif', de: 'Prädiktives Trenddiagramm', pt: 'Gráfico de Tendência Preditiva', zh: '预测趋势图' },
+    'demand_mix': { es: 'Mix de Demanda', en: 'Demand Mix', fr: 'Mix de Demande', de: 'Nachfragemix', pt: 'Mix de Demanda', zh: '需求结构' },
+    'standard': { es: 'Estándar', en: 'Standard', fr: 'Standard', de: 'Standard', pt: 'Padrão', zh: '标准' },
+    'urgent': { es: 'Urgente', en: 'Urgent', fr: 'Urgent', de: 'Dringend', pt: 'Urgente', zh: '紧急' },
+    'special': { es: 'Especial', en: 'Special', fr: 'Spécial', de: 'Spezial', pt: 'Especial', zh: '特殊' },
+    'mix_efficiency_impact': {
+        es: 'El mix actual indica una saturación por órdenes urgentes que impacta la eficiencia en un {value}.',
+        en: 'The current mix indicates saturation by urgent orders impacting efficiency by {value}.',
+        fr: 'Le mix actuel indique une saturation par les commandes urgentes impactant l\'efficacité de {value}.',
+        de: 'Der aktuelle Mix deutet auf eine Sättigung durch dringende Aufträge hin, die die Effizienz um {value} beeinträchtigt.',
+        pt: 'O mix atual indica uma saturação por ordens urgentes que impacta a eficiência em {value}.',
+        zh: '目前的结构表明紧急订单已饱和，影响效率 {value}。'
+    },
+};

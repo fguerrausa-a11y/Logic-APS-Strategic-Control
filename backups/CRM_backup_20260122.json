@@ -1,0 +1,166 @@
+{
+    "project_name": "CRM Corporativo 80/20",
+    "project_id": "dqdwtpalqezuylnkofwx",
+    "backup_date": "2026-01-22",
+    "migrations": [
+        {
+            "version": "20260116214135",
+            "name": "initial_crm_schema"
+        },
+        {
+            "version": "20260116220243",
+            "name": "fix_profiles_rls_for_registration"
+        },
+        {
+            "version": "20260116222344",
+            "name": "auto_create_profile_trigger"
+        },
+        {
+            "version": "20260121192915",
+            "name": "create_admin_profile"
+        },
+        {
+            "version": "20260121193701",
+            "name": "add_settings_to_profiles"
+        },
+        {
+            "version": "20260121194055",
+            "name": "fix_auth_triggers_and_rls"
+        },
+        {
+            "version": "20260121200159",
+            "name": "enhance_schema_for_crm_logic"
+        },
+        {
+            "version": "20260121200942",
+            "name": "seed_sample_data_v2"
+        }
+    ],
+    "data": {
+        "profiles": [
+            {
+                "id": "f14955de-04f7-4475-9c94-3e053d69a375",
+                "full_name": "Ana Martínez",
+                "role": "Comercial",
+                "created_at": "2026-01-21 20:09:42.852526+00",
+                "theme": "light",
+                "notification_settings": {
+                    "new_leads": true,
+                    "daily_summary": true,
+                    "activity_reminders": true
+                }
+            },
+            {
+                "id": "79601d87-5ab3-4c83-ac67-e91a6b6bfa96",
+                "full_name": "Carlos Rodríguez",
+                "role": "Comercial",
+                "created_at": "2026-01-21 20:09:42.852526+00",
+                "theme": "light",
+                "notification_settings": {
+                    "new_leads": true,
+                    "daily_summary": true,
+                    "activity_reminders": true
+                }
+            },
+            {
+                "id": "9ce64afa-6a8d-4240-b374-0557de61d0d7",
+                "full_name": "Elena Gómez",
+                "role": "Comercial",
+                "created_at": "2026-01-21 20:09:42.852526+00",
+                "theme": "light",
+                "notification_settings": {
+                    "new_leads": true,
+                    "daily_summary": true,
+                    "activity_reminders": true
+                }
+            },
+            {
+                "id": "0f5beb12-95cc-418f-8220-184e21d2b257",
+                "full_name": "Marcos López",
+                "role": "Comercial",
+                "created_at": "2026-01-21 20:09:42.852526+00",
+                "theme": "light",
+                "notification_settings": {
+                    "new_leads": true,
+                    "daily_summary": true,
+                    "activity_reminders": true
+                }
+            },
+            {
+                "id": "e8bdaddc-6f81-476e-ba7e-0ae949c269e1",
+                "full_name": "Sofía Vázquez",
+                "role": "Comercial",
+                "created_at": "2026-01-21 20:09:42.852526+00",
+                "theme": "light",
+                "notification_settings": {
+                    "new_leads": true,
+                    "daily_summary": true,
+                    "activity_reminders": true
+                }
+            },
+            {
+                "id": "d44c40db-c8b4-4980-b4c3-b3da7542fe9a",
+                "full_name": "Fabian Guerra",
+                "role": "Admin",
+                "created_at": "2026-01-21 19:29:15.204556+00",
+                "theme": "light",
+                "notification_settings": {
+                    "new_leads": true,
+                    "daily_summary": true,
+                    "activity_reminders": true
+                }
+            }
+        ],
+        "automation_logs": [
+            {
+                "id": "ffecd9b6-4e95-41b5-9e95-032de95acb31",
+                "entity_type": "Lead",
+                "entity_id": null,
+                "event": "Created",
+                "action": "Auto-assign",
+                "details": {
+                    "source": "Web Form",
+                    "assigned_to": "Ana Martínez"
+                },
+                "created_at": "2026-01-21 20:09:42.852526+00"
+            },
+            {
+                "id": "022dba4f-e29f-4cda-83ca-81d45d9ddfb5",
+                "entity_type": "Opportunity",
+                "entity_id": null,
+                "event": "Stage Change",
+                "action": "Email Notification",
+                "details": {
+                    "to": "Marcos López",
+                    "stage": "Closed Won"
+                },
+                "created_at": "2026-01-21 20:09:42.852526+00"
+            },
+            {
+                "id": "c0293e2f-5ef2-4980-9177-1e6aba7bdd11",
+                "entity_type": "Activity",
+                "entity_id": null,
+                "event": "Overdue",
+                "action": "SLA Alert",
+                "details": {
+                    "delay": "24h",
+                    "activity_id": "..."
+                },
+                "created_at": "2026-01-21 20:09:42.852526+00"
+            },
+            {
+                "id": "cbfaec9c-cfad-49d9-b102-88695f463049",
+                "entity_type": "Account",
+                "entity_id": null,
+                "event": "Tier Update",
+                "action": "Workflow Trigger",
+                "details": {
+                    "tier": "Gold",
+                    "revenue": 500000
+                },
+                "created_at": "2026-01-21 20:09:42.852526+00"
+            }
+        ]
+    },
+    "note": "Este archivo contiene una captura de los datos y migraciones del proyecto CRM Corporativo 80/20 antes de ser pausado para liberar el slot gratuito."
+}

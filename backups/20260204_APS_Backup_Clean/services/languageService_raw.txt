@@ -1,0 +1,446 @@
+﻿
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+
+type Language = 'es' | 'en' | 'fr' | 'de' | 'pt' | 'zh';
+
+interface Translations {
+    [key: string]: {
+        [K in Language]: string;
+    };
+}
+
+const translations: Translations = {
+    // Common / Sidebar
+    'main_menu': { es: 'Menú Principal', en: 'Main Menu', fr: 'Menu Principal', de: 'Hauptmenü', pt: 'Menu Principal', zh: 'ä¸»èœå•' },
+    'dashboard': { es: 'Panel de Control', en: 'Dashboard', fr: 'Tableau de Bord', de: 'Dashboard', pt: 'Painel de Controle', zh: 'ä»ªè¡¨æ¿' },
+    'schedule': { es: 'Cronograma de Producción', en: 'Production Schedule', fr: 'Calendrier de Production', de: 'Produktionsplan', pt: 'Cronograma de ProduÃ§Ã£o', zh: '生产排程' },
+    'work_centers': { es: 'Carga de Centros', en: 'Work Center Loading', fr: 'Charge des Centres', de: 'Centers-Belastung', pt: 'Carga de Centros', zh: '工作中心负载' },
+    'inventory_buffers': { es: 'Buffers de Inventario', en: 'Inventory Buffers', fr: 'Buffers de Stock', de: 'Bestandspuffer', pt: 'Buffers de Inventário', zh: '库存缓冲' },
+    'data_explorer': { es: 'Explorador de Datos', en: 'Data Explorer', fr: 'Explorateur de Données', de: 'Daten-Explorer', pt: 'Explorador de Dados', zh: 'æ•°æ®èµ„æºç®¡ç†å™¨' },
+    'reports': { es: 'Salidas y Reportes', en: 'Outputs & Reports', fr: 'Sorties et Rapports', de: 'Ausgaben & Berichte', pt: 'Saídas e Relatórios', zh: '输出与报告' },
+    'intelligence': { es: 'Inteligencia', en: 'Intelligence', fr: 'Intelligence', de: 'Intelligenz', pt: 'Inteligência', zh: '智能' },
+    'strategic_ia': { es: 'IA Estratégica', en: 'Strategic AI', fr: 'IA Stratégique', de: 'Strategische KI', pt: 'IA Estratégica', zh: '战略 AI' },
+    'analytics': { es: 'Analíticas', en: 'Analytics', fr: 'Analytiques', de: 'Analysen', pt: 'Analíticas', zh: 'åˆ†æž' },
+    'settings': { es: 'Configuración', en: 'Settings', fr: 'Configuration', de: 'Einstellungen', pt: 'ConfiguraÃ§Ã£o', zh: '设置' },
+    'visual_aesthetic': { es: 'Estética Visual', en: 'Visual Aesthetic', fr: 'Esthétique Visuelle', de: 'Visuelle Ã„sthetik', pt: 'Estética Visual', zh: '视觉美学' },
+    'language': { es: 'Idioma', en: 'Language', fr: 'Langue', de: 'Sprache', pt: 'Idioma', zh: 'è¯­è¨€' },
+    'logout': { es: 'Cerrar sesión', en: 'Logout', fr: 'Déconnexion', de: 'Ausloggen', pt: 'Sair', zh: '登出' },
+
+    // Simulation Console
+    'simulation_console': { es: 'Consola de Simulación', en: 'Simulation Console', fr: 'Console de Simulation', de: 'Simulationskonsole', pt: 'Console de Simulação', zh: '模拟æŽ§åˆ¶å°' },
+    'advanced_planning': { es: 'Advanced Planning & Scheduling System', en: 'Advanced Planning & Scheduling System', fr: 'Système de Planification Avancée', de: 'Fortgeschrittenes Planungssystem', pt: 'Sistema de Planejamento Avançado', zh: '高级计划与排程系统' },
+    'active_scenario': { es: 'Escenario Activo', en: 'Active Scenario', fr: 'Scénario Actif', de: 'Aktives Szenario', pt: 'Cenário Ativo', zh: '活动业务场景' },
+    'select_simulation': { es: 'Seleccionar SimulaciÃ³n', en: 'Select Simulation', fr: 'Sélectionner Simulación', de: 'Simulation AuswÃ¤hlen', pt: 'Selecionar SimulaÃ§Ã£o', zh: 'é€‰æ‹©模拟' },
+    'no_simulations': { es: 'No hay simulaciones guardadas', en: 'No saved simulations', fr: 'Pas de simulations enregistrées', de: 'Keine gespeicherten Simulationen', pt: 'Nenhuma simulação salva', zh: 'æ²¡æœ‰ä¿å­˜çš„模拟' },
+    'delete_msg_single': { es: 'Â¿EstÃ¡s seguro de que deseas eliminar esta simulaciÃ³n?', en: 'Are you sure you want to delete this simulation?', fr: 'ÃŠtes-vous sÃ»r de vouloir supprimer cette simulation?', de: 'Sind Sie sicher, dass Sie diese Simulation lÃ¶schen mÃ¶chten?', pt: 'Tem certeza que desea excluir esta simulação?', zh: 'æ‚¨ç¡®å®šè¦åˆ é™¤æ­¤模拟å—ï¼Ÿ' },
+    'delete_msg_multiple': { es: 'Â¿EstÃ¡s seguro de que deseas eliminar las {count} simulaciones seleccionadas?', en: 'Are you sure you want to delete the {count} selected simulations?', fr: 'ÃŠtes-vous sÃ»r de vouloir supprimer les {count} simulations sÃ©lectionnÃ©es?', de: 'Sind Sie sicher, dass Sie die {count} ausgewÃ¤hlten Simulationen lÃ¶schen mÃ¶chten?', pt: 'Tem certeza de que deseja excluir las {count} simulaÃ§Ãµes selecionadas?', zh: 'æ‚¨ç¡®å®šè¦åˆ é™¤æ‰€é€‰çš„ {count} ä¸ª模拟å—ï¼Ÿ' },
+    'delete_btn': { es: 'Borrar', en: 'Delete', fr: 'Supprimer', de: 'LÃ¶schen', pt: 'Excluir', zh: 'åˆ é™¤' },
+    'launch_simulation': { es: 'Lanzar Simulación', en: 'Launch Simulation', fr: 'Lancer Simulation', de: 'Simulation Starten', pt: 'LanÃ§ar SimulaÃ§Ã£o', zh: 'å¯åŠ¨模拟' },
+    'calculating': { es: 'Calculando', en: 'Calculating', fr: 'Calcul en cours', de: 'Berechnung', pt: 'Calculando', zh: 'è®¡ç®—ä¸­' },
+    'sync_erp': { es: 'Sincronizar ERP', en: 'Sync to ERP', fr: 'Synchroniser ERP', de: 'ERP Synchronisieren', pt: 'Sincronizar ERP', zh: 'åŒæ­¥ ERP' },
+    'gantt_chart': { es: 'Cronograma', en: 'Gantt Chart', fr: 'Diagramme de Gantt', de: 'Gantt-Diagramm', pt: 'Cronograma', zh: '甘特图' },
+
+    // Simulation Sidebar
+    'simulation_strategy': { es: 'Estrategia de Simulación', en: 'Simulation Strategy', fr: 'StratÃ©gie de Simulation', de: 'Simulationsstrategie', pt: 'EstratÃ©gia de SimulaÃ§Ã£o', zh: '模拟ç­–ç•¥' },
+    'consider_maintenance': { es: 'Considerar Mantenimiento', en: 'Consider Maintenance', fr: 'ConsidÃ©rer la Maintenance', de: 'Wartung BerÃ¼cksichtigen', pt: 'Considerar ManutenÃ§Ã£o', zh: 'è€ƒè™‘ç»´æŠ¤' },
+    'deadline': { es: 'Fecha Límite', en: 'Deadline', fr: 'Date Limite', de: 'Frist', pt: 'Data Limite', zh: 'æˆªæ­¢æ—¥æœŸ' },
+    'demand_filter': { es: 'Filtro de Demanda', en: 'Demand Filter', fr: 'Filtre de Demande', de: 'Nachfragefilter', pt: 'Filtro de Demanda', zh: 'éœ€æ±‚ç­›é€‰' },
+    'all_demand': { es: 'Toda la Demanda', en: 'All Demand', fr: 'Toute la Demande', de: 'Gesamte Nachfrage', pt: 'Toda a Demanda', zh: 'æ‰€æœ‰éœ€æ±‚' },
+    'installed_capacity': { es: 'Capacidad Instalada (Total)', en: 'Installed Capacity (Total)', fr: 'CapacitÃ© InstallÃ©e (Total)', de: 'Installierte KapazitÃ¤t (Gesamt)', pt: 'Capacidade Instalada (Total)', zh: 'è£…æœºå®¹é‡ï¼ˆæ€»è®¡ï¼‰' },
+    'active_machines': { es: 'Máquinas Activas', en: 'Active Machines', fr: 'Machines Actives', de: 'Aktive Maschinen', pt: 'MÃ¡quinas Ativas', zh: 'æ´»åŠ¨æœºåºŠ' },
+    'saturation_detected': { es: 'Saturación Detectada', en: 'Saturation Detected', fr: 'Saturation DÃ©tectÃ©e', de: 'SÃ¤ttigung Erkannt', pt: 'SaturaÃ§Ã£o Detectada', zh: 'æ£€æµ‹åˆ°é¥±å’Œ' },
+    'history': { es: 'Historial', en: 'History', fr: 'Historique', de: 'Verlauf', pt: 'HistÃ³rico', zh: 'åŽ†å²' },
+
+    // Results
+    'selected_scenario_tag': { es: 'Escenario Seleccionado', en: 'Selected Scenario', fr: 'ScÃ©nario SÃ©lectionnÃ©', de: 'AusgewÃ¤hltes Szenario', pt: 'CenÃ¡rio Selecionado', zh: 'é€‰å®šåœºæ™¯' },
+    'simulation_success_msg': {
+        es: 'Simulación procesada con éxito. Se detectaron {count} nuevas oportunidades de producciÃ³n y un plan de compras ajustado para evitar quebras de stock.',
+        en: 'Simulation processed successfully. {count} new production opportunities detected and an adjusted purchasing plan to prevent stockouts.',
+        fr: 'Simulation traitÃ©e avec succÃ¨s. {count} nouvelles opportunitÃ©s de production dÃ©tectÃ©es et un plan d\'achat ajustÃ© pour Ã©viter les ruptures de stock.',
+        de: 'Simulation erfolgreich verarbeitet. {count} neue ProduktionsmÃ¶glichkeiten erkannt und ein angepasster Einkaufsplan zur Vermeidung von LagerengpÃ¤ssen.',
+        pt: 'SimulaÃ§Ã£o processada com sucesso. Foram detectadas {count} novas oportunidades de produÃ§Ã£o e um plano de compras ajustado para evitar rupturas de estoque.',
+        zh: '模拟å¤„ç†æˆåŠŸã€‚æ£€æµ‹åˆ° {count} ä¸ªæ–°çš„ç”Ÿäº§æœºä¼šï¼Œå¹¶è°ƒæ•´äº†é‡‡è´­è®¡åˆ’ä»¥é˜²æ­¢ç¼ºè´§ã€‚'
+    },
+    'production_proposal': { es: 'Propuesta de Producción', en: 'Production Proposal', fr: 'Proposition de Production', de: 'Produktionsvorschlag', pt: 'Proposta de ProduÃ§Ã£o', zh: 'ç”Ÿäº§ææ¡ˆ' },
+    'product_quantity': { es: 'Producto / Cantidad', en: 'Product / Quantity', fr: 'Produit / QuantitÃ©', de: 'Produkt / Menge', pt: 'Produto / Quantidade', zh: 'äº§å“ / æ•°é‡' },
+    'delay': { es: 'Retraso', en: 'Delay', fr: 'Retard', de: 'VerzÃ¶gerung', pt: 'Atraso', zh: 'å»¶è¿Ÿ' },
+    'proposed': { es: 'Propuesta', en: 'Proposed', fr: 'ProposÃ©', de: 'Vorgeschlagen', pt: 'Proposta', zh: 'å»ºè®®' },
+    'new': { es: 'Nueva', en: 'New', fr: 'Nouveau', de: 'Neu', pt: 'Nova', zh: 'æ–°å»º' },
+    'critical_purchases': { es: 'Compras Críticas Requeridas', en: 'Critical Purchases Required', fr: 'Achats Critiques Requis', de: 'Kritische EinkÃ¤ufe Erforderlich', pt: 'Compras Críticas NecessÃ¡rias', zh: 'éœ€è¦å…³é”®é‡‡è´­' },
+    'ref': { es: 'Ref', en: 'Ref', fr: 'RÃ©f', de: 'Ref', pt: 'Ref', zh: 'å‚è€ƒ' },
+    'arrival': { es: 'Arribo', en: 'Arrival', fr: 'ArrivÃ©e', de: 'Ankunft', pt: 'Chegada', zh: 'åˆ°è¾¾' },
+    'comp': { es: 'Comp', en: 'Comp', fr: 'Comp', de: 'Komp', pt: 'Comp', zh: 'ç»„ä»¶' },
+
+    // Dashboard
+    'strategic_control': { es: 'Centro de Control Estratégico', en: 'Strategic Control Center', fr: 'Centre de ContrÃ´le StratÃ©gique', de: 'Strategisches Kontrollzentrum', pt: 'Centro de Controle EstratÃ©gico', zh: 'æˆ˜ç•¥æŽ§åˆ¶ä¸­å¿ƒ' },
+    'global_overview': { es: 'Global Overview', en: 'Global Overview', fr: 'Vue d\'ensemble Globale', de: 'Globaler Ãœberblick', pt: 'VisÃ£o Geral Global', zh: 'å…¨çƒæ¦‚è§ˆ' },
+    'ops_status': { es: 'Estado de Operaciones', en: 'Operations Status', fr: 'Ã‰tat des OpÃ©rations', de: 'Betriebsstatus', pt: 'Status das OperaÃ§Ãµes', zh: 'è¿è¥çŠ¶æ€' },
+    'ops_monitoring': { es: 'Monitoreo táctico de recursos y demanda en tiempo real.', en: 'Tactical monitoring of resources and demand in real time.', fr: 'Suivi tactique des ressources et de la demande en temps rÃ©el.', de: 'Taktische Ãœberwachung von Ressourcen und Nachfrage en Echtzeit.', pt: 'Monitoramento tÃ¡tico de recursos e demanda em tempo real.', zh: 'å®žæ—¶èµ„æºå’Œéœ€æ±‚æˆ˜æœ¯ç›‘æŽ§ã€‚' },
+    'network_load': { es: 'Carga de Red', en: 'Network Load', fr: 'Charge du RÃ©seau', de: 'Netzwerklast', pt: 'Carga de Rede', zh: 'ç½‘ç»œè´Ÿè½½' },
+    'capacity': { es: 'Capacidad', en: 'Capacity', fr: 'CapacitÃ©', de: 'KapazitÃ¤t', pt: 'Capacidade', zh: 'å®¹é‡' },
+    'historical_performance': { es: 'Rendimiento Histórico', en: 'Historical Performance', fr: 'Performance Historique', de: 'Historische Leistung', pt: 'Desempenho HistÃ³rico', zh: 'åŽ†å²æ€§èƒ½' },
+    'direct_traceability': { es: 'Trazabilidad Directa', en: 'Direct Traceability', fr: 'TraÃ§abilitÃ© Directe', de: 'Direkte RÃ¼ckverfolgbarkeit', pt: 'Rastreabilidade Direta', zh: 'ç›´æŽ¥è¿½æº¯' },
+    'oee_efficiency': { es: 'Eficiencia OEE', en: 'OEE Efficiency', fr: 'EfficacitÃ© OEE', de: 'OEE-Effizienz', pt: 'EficiÃªncia OEE', zh: 'OEE æ•ˆçŽ‡' },
+    'compliance': { es: 'Cumplimiento', en: 'Compliance', fr: 'Compliance', de: 'Einhaltung', pt: 'Conformidade', zh: 'åˆè§„æ€§' },
+    'active_delays': { es: 'Retrasos Activos', en: 'Active Delays', fr: 'Retards Actifs', de: 'Aktive VerzÃ¶gerungen', pt: 'Atrasos Ativos', zh: 'æ´»åŠ¨å»¶è¿Ÿ' },
+    'operative_cost': { es: 'Costo Operativo', en: 'Operative Cost', fr: 'CoÃ»t OpÃ©rationnel', de: 'Betriebskosten', pt: 'Custo Operativo', zh: 'è¿è¥æˆæœ¬' },
+    'scheduled_ops': { es: 'Planificadas', en: 'Scheduled', fr: 'PlanifiÃ©es', de: 'Geplant', pt: 'Planejadas', zh: 'å·²è®¡åˆ’' },
+    'on_time': { es: 'A Tiempo', en: 'On Time', fr: 'Ã€ Temps', de: 'PÃ¼nktlich', pt: 'A Tempo', zh: 'æŒ‰æ—¶' },
+    'deviation': { es: 'Desviación', en: 'Deviation', fr: 'DÃ©viation', de: 'Abweichung', pt: 'Desvio', zh: 'åå·®' },
+    'root_cause': { es: 'Causa Raíz', en: 'Root Cause', fr: 'Cause Racine', de: 'Ursache', pt: 'Causa Raiz', zh: 'æ ¹æœ¬åŽŸå› ' },
+
+    // Schedule
+    'operation_detail': { es: 'Detalle de Operación', en: 'Operation Detail', fr: 'DÃ©tail de l\'OpÃ©ration', de: 'Operationsdetail', pt: 'Detalhe da OperaÃ§Ã£o', zh: 'æ“ä½œè¯¦æƒ…' },
+    'op_product': { es: 'OP / Producto', en: 'WO / Product', fr: 'OF / Produit', de: 'FA / Produkt', pt: 'OP / Produto', zh: 'å·¥å• / äº§å“' },
+    'aps_suggestion': { es: 'Sugerencia APS', en: 'APS Suggestion', fr: 'Suggestion APS', de: 'APS-Vorschlag', pt: 'SugestÃ£o APS', zh: 'APS å»ºè®®' },
+    'start': { es: 'Inicio', en: 'Start', fr: 'DÃ©but', de: 'Beginn', pt: 'InÃ­cio', zh: 'å¼€å§‹' },
+    'end': { es: 'Fin', en: 'End', fr: 'Fin', de: 'Ende', pt: 'Fim', zh: 'ç»“æŸ' },
+    'export': { es: 'Exportar', en: 'Export', fr: 'Exporter', de: 'Exportieren', pt: 'Exportar', zh: 'å¯¼å‡º' },
+    'zoom': { es: 'Zoom', en: 'Zoom', fr: 'Zoom', de: 'Zoom', pt: 'Zoom', zh: 'ç¼©æ”¾' },
+    'time_grain': { es: 'Granularidad', en: 'Time Grain', fr: 'GranularitÃ©', de: 'Zeitspanne', pt: 'Granularidade', zh: 'æ—¶é—´ç²’åº¦' },
+    'hours': { es: 'Horas', en: 'Hours', fr: 'Heures', de: 'Stunden', pt: 'Horas', zh: 'å°æ—¶' },
+    'days': { es: 'DÃ­as', en: 'Days', fr: 'Jours', de: 'Tage', pt: 'Dias', zh: 'å¤©' },
+    'weeks': { es: 'Semanas', en: 'Weeks', fr: 'Semaines', de: 'Wochen', pt: 'Semanas', zh: 'å‘¨' },
+
+    // Schedule UI
+    'tactical_planning': { es: 'Planificación Táctica', en: 'Tactical Planning', fr: 'Planification Tactique', de: 'Taktische Planung', pt: 'Planejamento TÃ¡tico', zh: 'æˆ˜æœ¯è®¡åˆ’' },
+    'finite_capacity': { es: 'Capacidad Finita', en: 'Finite Capacity', fr: 'CapacitÃ© Finie', de: 'Endliche KapazitÃ¤t', pt: 'Capacidade Finita', zh: 'æœ‰é™äº§èƒ½' },
+    'operations_count': { es: '{count} Operaciones', en: '{count} Operations', fr: '{count} OpÃ©rations', de: '{count} Operationen', pt: '{count} OperaÃ§Ãµes', zh: '{count} ä¸ªæ“ä½œ' },
+    'today': { es: 'Hoy', en: 'Today', fr: 'Aujourd\'hui', de: 'Heute', pt: 'Hoje', zh: 'ä»Šå¤©' },
+    'stockflow_projected': { es: 'StockFlow Proyectado', en: 'Projected StockFlow', fr: 'StockFlow ProjetÃ©', de: 'Projizierter StockFlow', pt: 'StockFlow Projetado', zh: 'é¢„è®¡åº“å­˜æµ' },
+    'inventory_traceability': { es: 'Trazabilidad de Inventario por Escenario', en: 'Inventory Traceability by Scenario', fr: 'TraÃ§abilitÃ© des Stocks par ScÃ©nario', de: 'Bestandsverfolgbarkeit nach Szenario', pt: 'Rastreabilidade de InventÃ¡rio por CenÃ¡rio', zh: 'æŒ‰åœºæ™¯åˆ’åˆ†çš„åº“å­˜è¿½æº¯' },
+    'empty_simulation': { es: 'Simulación Vacía', en: 'Empty Simulation', fr: 'Simulation Vide', de: 'Leere Simulation', pt: 'SimulaÃ§Ã£o Vazia', zh: 'ç©ºç™½模拟' },
+    'empty_simulation_desc': { es: 'No hay operaciones programadas para este escenario.', en: 'No operations scheduled for this scenario.', fr: 'Aucune opÃ©ration planifiÃ©e pour ce scÃ©nario.', de: 'Keine geplanten Operationen fÃ¼r dieses Szenario.', pt: 'Nenhuma operaÃ§Ã£o programada para este cenÃ¡rio.', zh: 'æ­¤åœºæ™¯æ²¡æœ‰å®‰æŽ’ä»»ä½•æ“ä½œã€‚' },
+    'refresh': { es: 'Refrescar Datos', en: 'Refresh Data', fr: 'Actualiser les DonnÃ©es', de: 'Daten Aktualisieren', pt: 'Atualizar Dados', zh: 'åˆ·æ–°æ•°æ®' },
+    'resources': { es: 'Recursos', en: 'Resources', fr: 'Ressources', de: 'Ressourcen', pt: 'Recursos', zh: 'èµ„æº' },
+
+    // AI Analyst
+    'ai_analyst_title': { es: 'Analista IA Logic', en: 'Logic AI Analyst', fr: 'Analyste IA Logic', de: 'Logic KI-Analyst', pt: 'Analista IA Logic', zh: 'Logic AI åˆ†æžå¸ˆ' },
+    'ai_welcome_msg': { es: 'Â¡Hola! Soy tu Analista IA. He analizado la simulaciÃ³n actual. Â¿En quÃ© puedo ayudarte con los retrasos o la carga de mÃ¡quinas?', en: 'Hello! I am your AI Analyst. I have analyzed the current simulation. How can I help you with delays or machine load?', fr: 'Bonjour ! Je suis votre Analyste IA. J\'ai analysÃ© la simulation actuelle. Comment puis-je vous aider avec les retards ou la charge des machines ?', de: 'Hallo! Ich bin Ihr KI-Analyst. Ich habe die aktuelle Simulation analysiert. Wie kann ich Ihnen bei VerzÃ¶gerungen oder der Maschinenauslastung helfen?', pt: 'OlÃ¡! Sou seu Analista IA. Analisei a simulação atual. Como posso ajudÃ¡-lo com atrasos ou carga de mÃ¡quinas?', zh: 'æ‚¨å¥½ï¼æˆ‘æ˜¯æ‚¨çš„ AI åˆ†æžå¸ˆã€‚æˆ‘å·²ç»åˆ†æžäº†å½“å‰çš„模拟ã€‚æˆ‘è¯¥å¦‚ä½•å¸®åŠ©æ‚¨è§£å†³å»¶è¿Ÿæˆ–æœºå™¨è´Ÿè½½é—®é¢˜ï¼Ÿ' },
+    'ai_analyzing': { es: 'Analizando...', en: 'Analyzing...', fr: 'Analyse...', de: 'Analysieren...', pt: 'Analisando...', zh: 'åˆ†æžä¸­...' },
+    'ai_online': { es: 'En lÃ­nea y listo', en: 'Online and ready', fr: 'En ligne et prÃªt', de: 'Online und bereit', pt: 'Online e pronto', zh: 'åœ¨çº¿å¹¶å‡†å¤‡å°±ç»ª' },
+    'ai_placeholder': { es: 'Pregunta sobre la simulación...', en: 'Ask about the simulation...', fr: 'Posez une question sur la simulation...', de: 'Fragen Sie nach der Simulation...', pt: 'Pergunte sobre a simulação...', zh: 'è¯¢é—®æœ‰å…³模拟çš„é—®é¢˜...' },
+    'ai_support_tag': { es: 'IA TÃ¡ctica de Soporte Operativo', en: 'Tactical Operational Support AI', fr: 'IA de Support OpÃ©rationnel Tactique', de: 'Taktische operative UnterstÃ¼tzungs-KI', pt: 'IA de Suporte Operacional TÃ¡tico', zh: 'æˆ˜æœ¯è¿è¥æ”¯æŒ AI' },
+    'ai_error_msg': { es: 'Lo siento, hubo un error al procesar tu consulta. Por favor, intenta de nuevo.', en: 'Sorry, there was an error processing your request. Please try again.', fr: 'DÃ©solÃ©, une erreur s\'est produite lors del traitement de votre demande. Veuillez rÃ©essayer.', de: 'Entschuldigung, bei der Bearbeitung Ihrer Anfrage ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.', pt: 'Desculpe, houve um erro ao processar sua consulta. Por favor, tente novamente.', zh: 'æŠ±æ­‰ï¼Œå¤„ç†æ‚¨çš„è¯·æ±‚æ—¶å‡ºçŽ°é”™è¯¯ã€‚è¯·å†è¯•ä¸€æ¬¡ã€‚' },
+
+    // Settings
+    'aps_config_params': { es: 'ParÃ¡metros de Configuración APS', en: 'APS Configuration Parameters', fr: 'ParamÃ¨tres de Configuration APS', de: 'APS-Konfigurationsparameter', pt: 'ParÃ¢metros de ConfiguraÃ§Ã£o APS', zh: 'APS é…ç½®å‚æ•°' },
+    'engine_mode': { es: 'Motor de ProgramaciÃ³n (Engine Mode)', en: 'Programming Engine (Engine Mode)', fr: 'Moteur de Programmation (Mode Moteur)', de: 'Programm-Engine (Engine-Modus)', pt: 'Motor de ProgramaÃ§Ã£o (Engine Mode)', zh: 'ç¼–ç¨‹å¼•æ“Žï¼ˆå¼•æ“Žæ¨¡å¼ï¼‰' },
+    'engine_desc': { es: 'Configura la filosofÃ­a de planificaciÃ³n de toda la planta.', en: 'Configure the planning philosophy of the entire plant.', fr: 'Configurez la philosophie de planification de toute l\'usine.', de: 'Konfigurieren Sie die Planungsphilosophie des gesamten Werks.', pt: 'Configure a filosofia de planejamento de toda a planta.', zh: 'é…ç½®æ•´ä¸ªå·¥åŽ‚çš„è§„åˆ’ç†å¿µã€‚' },
+    'scheduling_modality': { es: 'Modalidad de Programación', en: 'Scheduling Modality', fr: 'ModalitÃ© de Planification', de: 'PlanungsmodalitÃ¤t', pt: 'Modalidade de ProgramaÃ§Ã£o', zh: 'æŽ’ç¨‹æ–¹å¼' },
+    'bottleneck_mgmt': { es: 'Gestión de Cuellos de Botella', en: 'Bottleneck Management', fr: 'Gestion des Goulets d\'Ã‰tranglement', de: 'Engpassmanagement', pt: 'GestÃ£o de Gargalos', zh: 'ç“¶é¢ˆç®¡ç†' },
+    'sync_overlap': { es: 'Sincronización y Solapamiento', en: 'Sync and Overlap', fr: 'Synchronisation et Chevauchement', de: 'Synchronisierung und Ãœberlappung', pt: 'SincronizaÃ§Ã£o e SobreposiÃ§Ã£o', zh: 'åŒæ­¥ä¸Žé‡å ' },
+    'sync_desc': { es: 'CÃ³mo interactÃºan las tareas consecutivas.', en: 'How consecutive tasks interact.', fr: 'Comment les tÃ¢ches consÃ©cutives interagissent.', de: 'Wie aufeinanderfolgende Aufgaben interagieren.', pt: 'Como as tarefas consecutivas interagem.', zh: 'è¿žç»­ä»»åŠ¡å¦‚ä½•äº¤äº’ã€‚' },
+    'allow_overlap': { es: 'Permitir Solapamiento (Overlap)', en: 'Allow Overlap', fr: 'Autoriser le Chevauchement', de: 'Ãœberlappung Zulassen', pt: 'Permitir SobreposiÃ§Ã£o', zh: 'å…è®¸é‡å ' },
+    'overlap_desc': { es: 'Comenzar operaciÃ³n siguiente antes de terminar la actual.', en: 'Start next operation before finishing the current one.', fr: 'Commencer l\'opÃ©ration suivante avant de terminer l\'actuelle.', de: 'NÃ¤chste Operation beginnen, bevor la aktuelle abgeschlossen ist.', pt: 'ComeÃ§ar a prÃ³xima operaÃ§Ã£o antes de terminar a atual.', zh: 'åœ¨å®Œæˆå½“å‰æ“ä½œä¹‹å‰å¼€å§‹ä¸‹ä¸€ä¸ªæ“ä½œã€‚' },
+    'default_overlap_pct': { es: '% de Solapamiento Defecto', en: 'Default Overlap %', fr: '% de Chevauchement par DÃ©faut', de: 'StandardÃ¼berlappung %', pt: '% de SobreposiÃ§Ã£o PadrÃ£o', zh: 'é»˜è®¤é‡å  %' },
+    'reprovision_policies': { es: 'Políticas de Reaprovechamiento', en: 'Replenishment Policies', fr: 'Politiques de RÃ©approvisionnement', de: 'Nachschubrichtlinien', pt: 'PolÃ­ticas de Reabastecimiento', zh: 'è¡¥è´§æ”¿ç­–' },
+    'reprovision_desc': { es: 'Estrategia de reposiciÃ³n de materia prima y semi-elaborados.', en: 'Raw material and semi-finished products replenishment strategy.', fr: 'StratÃ©gie de rÃ©approvisionnement en matiÃ¨res premiÃ¨res et produits semi-finis.', de: 'Nachschubstrategie fÃ¼r Rohstoffe und Halbfabrikate.', pt: 'EstratÃ©gia de reposiÃ§Ã£o de matÃ©ria-primas e semi-acabados.', zh: 'åŽŸææ–™å’ŒåŠæˆå“è¡¥è´§ç­–ç•¥ã€‚' },
+    'inventory_policy': { es: 'PolÃ­tica de Inventario', en: 'Inventory Policy', fr: 'Politique de Stock', de: 'Bestandsrichtlinie', pt: 'PolÃ­tica de InventÃ¡rio', zh: 'åº“å­˜æ”¿ç­–' },
+    'default_buffer_days': { es: 'Buffer de Tiempo Defecto (DÃ­as)', en: 'Default Time Buffer (Days)', fr: 'Buffer de Temps par DÃ©faut (Jours)', de: 'Standardzeitpuffer (Tage)', pt: 'Buffer de Tempo PadrÃ£o (Dias)', zh: 'é»˜è®¤æ—¶é—´ç¼“å†²ï¼ˆå¤©ï¼‰' },
+    'shift_mgmt': { es: 'Gestión de Turnos (Capacidad)', en: 'Shift Management (Capacity)', fr: 'Gestion des Ã‰quipes (CapacitÃ©)', de: 'Schichtmanagement (KapazitÃ¤t)', pt: 'GestÃ£o de Turnos (Capacidade)', zh: 'ç­æ¬¡ç®¡ç†ï¼ˆäº§èƒ½ï¼‰' },
+    'shift_desc': { es: 'Define los horarios laborales para las mÃ¡quinas.', en: 'Define working hours for machines.', fr: 'DÃ©finissez les horaires de travail des machines.', de: 'Arbeitszeiten fÃ¼r Maschinen definieren.', pt: 'Defina os horÃ¡rios de trabalho das mÃ¡quinas.', zh: 'å®šä¹‰æœºå™¨çš„å·¥ä½œæ—¶é—´ã€‚' },
+    'machine_assignment': { es: 'Asignación a Máquinas', en: 'Machine Assignment', fr: 'Affectation aux Machines', de: 'Maschinenzuweisung', pt: 'AtribuiÃ§Ã£o Ã s MÃ¡quinas', zh: 'æœºå™¨åˆ†é…' },
+    'wc_params': { es: 'ParÃ¡metros por Centro de Trabajo (Equipos)', en: 'Work Center Parameters (Units)', fr: 'ParamÃ¨tres par Centre de Travail (UnitÃ©s)', de: 'Arbeitsplatzparameter (Einheiten)', pt: 'ParÃ¢metros por Centro de Trabalho (Equipes)', zh: 'å·¥ä½œä¸­å¿ƒå‚æ•°ï¼ˆå•å…ƒï¼‰' },
+    'wc_desc': { es: 'Configura el solapamiento especÃ­fico para cada equipo.', en: 'Configure specific overlap for each unit.', fr: 'Configurez le chevauchement spÃ©cifique pour chaque unitÃ©.', de: 'Spezifische Ãœberlappung fÃ¼r jede Einheit konfigurieren.', pt: 'Configure a sobreposiÃ§Ã£o especÃ­fica para cada equipe.', zh: 'ä¸ºæ¯ä¸ªå•å…ƒé…ç½®ç‰¹å®šçš„é‡å ã€‚' },
+    'save_config': { es: 'Guardar Configuración', en: 'Save Configuration', fr: 'Enregistrer la Configuration', de: 'Konfiguration Speichern', pt: 'Salvar ConfiguraÃ§Ã£o', zh: 'ä¿å­˜é…ç½®' },
+    'loading_params': { es: 'Cargando parÃ¡metros...', en: 'Loading parameters...', fr: 'Chargement des paramÃ¨tres...', de: 'Parameter werden geladen...', pt: 'Carregando parÃ¢metros...', zh: 'æ­£åœ¨åŠ è½½å‚æ•°...' },
+    'success_save': { es: 'ParÃ¡metros actualizados correctamente.', en: 'Parameters updated successfully.', fr: 'ParamÃ¨tres mis Ã  jour avec succÃ¨s.', de: 'Parameter erfolgreich aktualisiert.', pt: 'ParÃ¢metros atualizados com sucesso.', zh: 'å‚æ•°æ›´æ–°æˆåŠŸã€‚' },
+    'error_save': { es: 'Error al guardar', en: 'Error saving', fr: 'Erreur lors de l\'enregistrement', de: 'Fehler beim Speichern', pt: 'Erro ao salvar', zh: 'ä¿å­˜é”™è¯¯' },
+
+    // Shifts
+    'work_shifts': { es: 'Turnos de Trabajo', en: 'Work Shifts', fr: 'Équipes de Travail', de: 'Arbeitsschichten', pt: 'Turnos de Trabalho', zh: 'å·¥ä½œç­æ¬¡' },
+    'new_shift': { es: 'Nuevo Turno', en: 'New Shift', fr: 'Nouvelle Ã‰quipe', de: 'Neue Schicht', pt: 'Novo Turno', zh: 'æ–°ç­æ¬¡' },
+    'save_changes': { es: 'Guardar Cambios', en: 'Save Changes', fr: 'Enregistrer les Changements', de: 'Ã„nderungen Speichern', pt: 'Salvar Alterações', zh: 'ä¿å­˜æ›´æ”¹' },
+    'no_shifts': { es: 'No hay turnos definidos.', en: 'No shifts defined.', fr: 'Aucune Ã©quipe dÃ©finie.', de: 'Keine Schichten definiert.', pt: 'NÃ£o hÃ¡ turnos definidos.', zh: 'æœªå®šä¹‰ç­æ¬¡ã€‚' },
+    'no_wc_found': { es: 'No se encontraron centros de trabajo para configurar.', en: 'No work centers found to configure.', fr: 'Aucun centre de travail trouvÃ© pour configurer.', de: 'Keine ArbeitsplÃ¤tze zum Konfigurieren gefunden.', pt: 'Nenhum centro de trabalho encontrado para configurar.', zh: 'æœªæ‰¾åˆ°å¯é…ç½®çš„å·¥ä½œä¸­å¿ƒã€‚' },
+    'cancel': { es: 'Cancelar', en: 'Cancel', fr: 'Annuler', de: 'Abbrechen', pt: 'Cancelar', zh: 'å–æ¶ˆ' },
+    'delete_confirm_shift': { es: 'Â¿Eliminar este turno?', en: 'Delete this shift?', fr: 'Supprimer cette Ã©quipe ?', de: 'Diese Schicht lÃ¶schen?', pt: 'Excluir este turno?', zh: 'åˆ é™¤æ­¤ç­æ¬¡ï¼Ÿ' },
+    'overlap': { es: 'Solapamiento', en: 'Overlap', fr: 'Chevauchement', de: 'Ãœberlappung', pt: 'SobreposiÃ§Ã£o', zh: 'é‡å ' },
+    'twenty_four_seven': { es: '24/7 (Sin Turno)', en: '24/7 (No Shift)', fr: '24/7 (Pas d\'Ã‰quipe)', de: '24/7 (Keine Schicht)', pt: '24/7 (Sem Turno)', zh: '24/7ï¼ˆæ— ç­æ¬¡ï¼‰' },
+
+    // Remnants & Extra
+    'delete_simulation': { es: 'Eliminar Simulación', en: 'Delete Simulation', fr: 'Supprimer Simulation', de: 'Simulation LÃ¶schen', pt: 'Excluir SimulaÃ§Ã£o', zh: 'åˆ é™¤模拟' },
+    'real_time_load': { es: 'Análisis de Carga en Tiempo Real', en: 'Real-time Load Analysis', fr: 'Analyse de Charge en Temps RÃ©el', de: 'Echtzeit-Lastanalyse', pt: 'AnÃ¡lise de Carga em Tempo Real', zh: 'å®žæ—¶è´Ÿè½½åˆ†æž' },
+    'waiting_engine': { es: 'Esperando ejecuciÃ³n del motor estratÃ©gico...', en: 'Waiting for strategic engine execution...', fr: 'En attente de l\'exÃ©cution du moteur stratÃ©gique...', de: 'Warten auf die AusfÃ¼hrung der strategischen Engine...', pt: 'Aguardando ejecuciÃ³n do motor estratÃ©gico...', zh: 'ç­‰å¾…æˆ˜ç•¥å¼•æ“Žæ‰§è¡Œ...' },
+    'data_sync': { es: 'Sincronización de Datos â€¢ Motor APS v5.3', en: 'Data Synchronization â€¢ APS Engine v5.3', fr: 'Synchronisation des DonnÃ©es â€¢ Moteur APS v5.3', de: 'Datensynchronisierung â€¢ APS-Engine v5.3', pt: 'SincronizaÃ§Ã£o de Datos â€¢ Motor APS v5.3', zh: 'æ•°æ®åŒæ­¥ â€¢ APS å¼•æ“Ž v5.3' },
+    'alert_delay_line': { es: 'Retraso en LÃ­nea 2', en: 'Line 2 Delay', fr: 'Retard Ligne 2', de: 'VerzÃ¶gerung Linie 2', pt: 'Atraso na Linha 2', zh: '2 å·çº¿å»¶è¿Ÿ' },
+    'alert_material_shortage': { es: 'Falta de material: Eje Principal', en: 'Material shortage: Main Axle', fr: 'Manque de matÃ©riel : Axe Principal', de: 'Materialmangel: Hauptachse', pt: 'Falta de material: Eixo Principal', zh: 'ææ–™çŸ­ç¼ºï¼šä¸»è½´' },
+    'alert_maint_cnc': { es: 'Mantenimiento CNC-04', en: 'CNC-04 Maintenance', fr: 'Maintenance CNC-04', de: 'CNC-04 Wartung', pt: 'ManutenÃ§Ã£o CNC-04', zh: 'CNC-04 ç»´æŠ¤' },
+    'alert_maint_done': { es: 'Preventivo 200h finalizado', en: '200h Preventive completed', fr: 'PrÃ©ventif 200h terminÃ©', de: '200h PrÃ¤vention abgeschlossen', pt: 'Preventivo 200h finalizado', zh: '200 å°æ—¶é¢„é˜²æ€§ç»´æŠ¤å·²å®Œæˆ' },
+    'alert_new_order': { es: 'Nueva Orden APS', en: 'New APS Order', fr: 'Nouvelle OF APS', de: 'Neuer APS-Auftrag', pt: 'Nova Ordem APS', zh: 'æ–° APS è®¢å•' },
+    'alert_scenario_applied': { es: 'Escenario aplicado', en: 'Scenario applied', fr: 'ScÃ©nario appliquÃ©', de: 'Szenario angewendet', pt: 'CenÃ¡rio aplicado', zh: 'åœºæ™¯å·²åº”ç”¨' },
+    'alert_warehouse_buffer': { es: 'Buffer de AlmacÃ©n', en: 'Warehouse Buffer', fr: 'Buffer d\'EntrepÃ´t', de: 'Lagerpuffer', pt: 'Buffer de ArmazÃ©m', zh: 'ä»“åº“ç¼“å†²' },
+    'alert_min_stock': { es: 'Stock mÃ­nimo en Insumo B', en: 'Min stock reached: Input B', fr: 'Stock minimum atteint : Insumo B', de: 'Mindestbestand erreicht: Input B', pt: 'Estoque mÃ­nimo em Insumo B', zh: 'è¾¾åˆ°æœ€å°åº“å­˜ï¼šè¾“å…¥ B' },
+
+    // Load Analysis
+    'wc_load_analysis': { es: 'Análisis de Carga de Centros', en: 'Work Center Load Analysis', fr: 'Analyse de Charge des Centres', de: 'Arbeitsplatz-Lastanalyse', pt: 'AnÃ¡lise de Carga de Centros', zh: '工作中心负载åˆ†æž' },
+    'wc_loading': { es: 'Carga de Centros de Trabajo', en: 'Work Center Loading', fr: 'Charge des Centres de Travail', de: 'Arbeitsplatz-Auslastung', pt: 'Carga de Centros de Trabalho', zh: '工作中心负载' },
+    'wc_load_desc': { es: 'Utilización de capacidad en tiempo real contra carga infinita.', en: 'Real-time capacity utilization against infinite load.', fr: 'Utilisation de la capacitÃ© en temps rÃ©el par rapport Ã  la charge infinie.', de: 'Echtzeit-KapazitÃ¤tsauslastung gegenÃ¼ber unendlicher Last.', pt: 'UtilizaÃ§Ã£o de capacidade em tempo real contra carga infinita.', zh: 'å®žæ—¶äº§èƒ½åˆ©ç”¨çŽ‡ä¸Žæ— é™è´Ÿè½½çš„å¯¹æ¯”ã€‚' },
+    'overload': { es: 'SOBRECARGA', en: 'OVERLOAD', fr: 'SURCHARGE', de: 'ÃœBERLAST', pt: 'SOBRECARGA', zh: 'è¿‡è½½' },
+    'eighty_cap': { es: '80% CAP', en: '80% CAP', fr: '80% CAP', de: '80% KAP', pt: '80% CAP', zh: '80% äº§èƒ½' },
+    'the_drum': { es: 'The Drum (Tambor)', en: 'The Drum (Tambor)', fr: 'Le Tambour', de: 'Die Trommel', pt: 'The Drum (Tambor)', zh: 'é¼“ (The Drum)' },
+    'material_buffers': { es: 'Buffers de Material', en: 'Material Buffers', fr: 'Buffers de MatÃ©riel', de: 'Materialpuffer', pt: 'Buffers de Material', zh: 'ç‰©æ–™ç¼“å†²' },
+    'low': { es: 'Bajo', en: 'Low', fr: 'Bas', de: 'Niedrig', pt: 'Baixo', zh: 'ä½Ž' },
+    'healthy': { es: 'Saludable', en: 'Healthy', fr: 'Sain', de: 'Gesund', pt: 'SaudÃ¡vel', zh: 'å¥åº·' },
+    'critical': { es: 'CrÃ­tico', en: 'Critical', fr: 'Critique', de: 'Kritisch', pt: 'CrÃ­tico', zh: 'å…³é”®' },
+
+    // Buffers
+    'inventory_buffers_title': { es: 'Buffers de Inventario', en: 'Inventory Buffers', fr: 'Buffers de Stock', de: 'Bestandspuffer', pt: 'Buffers de Inventário', zh: '库存缓冲' },
+    'buffer_status_dbm': { es: 'Estado de Buffers (DBM)', en: 'Buffer Status (DBM)', fr: 'Ã‰tat des Buffers (DBM)', de: 'Buffer-Status (DBM)', pt: 'Status de Buffers (DBM)', zh: 'ç¼“å†²çŠ¶æ€ (DBM)' },
+    'dbm_desc': { es: 'Monitoreo dinÃ¡mico basado en Theory of Constraints (TOC).', en: 'Dynamic monitoring based on Theory of Constraints (TOC).', fr: 'Suivi dynamique basÃ© sur la ThÃ©orie des Contraintes (TOC).', de: 'Dynamische Ãœberwachung basierend auf Theory of Constraints (TOC).', pt: 'Monitoramento dinÃ¢mico baseado em Theory of Constraints (TOC).', zh: 'åŸºäºŽçº¦æŸç†è®º (TOC) çš„åŠ¨æ€ç›‘æŽ§ã€‚' },
+    'reference': { es: 'Referencia', en: 'Reference', fr: 'RÃ©fÃ©rence', de: 'Referenz', pt: 'ReferÃªncia', zh: 'å‚è€ƒ' },
+    'delivery': { es: 'Entrega', en: 'Delivery', fr: 'Livraison', de: 'Lieferung', pt: 'Entrega', zh: 'äº¤ä»˜' },
+    'buffer_consumption': { es: 'Consumo de Buffer', en: 'Buffer Consumption', fr: 'Consommation du Buffer', de: 'Buffer-Verbrauch', pt: 'Consumo de Buffer', zh: 'ç¼“å†²æ¶ˆè€—' },
+    'inventory_optimization': { es: 'Optimización de Inventario', en: 'Inventory Optimization', fr: 'Optimisation des Stocks', de: 'Bestandsoptimierung', pt: 'OtimizaÃ§Ã£o de InventÃ¡rio', zh: 'åº“å­˜ä¼˜åŒ–' },
+    'opt_suggestion': {
+        es: 'El sistema sugiere reducir el lote de compra en el Ã­tem {item} para liberar {amount} de flujo de caja sin afectar el cumplimiento.',
+        en: 'The system suggests reducing the purchase lot for item {item} to free up {amount} of cash flow without affecting compliance.',
+        fr: 'Le systÃ¨me suggÃ¨re de rÃ©duire le lot d\'achat pour l\'article {item} afin de libÃ©rer {amount} de flux de trÃ©sorerie sans affecter la conformitÃ©.',
+        de: 'Das System schlÃ¤gt vor, das Los fÃ¼r Artikel {item} zu reduzieren, um {amount} an Cashflow freizusetzen, ohne die Einhaltung zu beeintrÃ¤chtigen.',
+        pt: 'O sistema sugere reduzir o lote de compra no item {item} para liberar {amount} de fluxo de caixa sem afetar a conformidade.',
+        zh: 'ç³»ç»Ÿå»ºè®®å‡å°‘ç‰©å“ {item} çš„é‡‡è´­æ‰¹æ¬¡ï¼Œä»¥åœ¨ä¸å½±å“åˆè§„æ€§çš„æƒ…å†µä¸‹é‡Šæ”¾ {amount} çš„çŽ°é‡‘æµã€‚'
+    },
+    // Data Explorer
+    'plant_engineering': { es: 'Ingeniería de Planta', en: 'Plant Engineering', fr: 'GÃ©nie Industriel', de: 'Anlagentechnik', pt: 'Engenharia de Planta', zh: 'å·¥åŽ‚å·¥ç¨‹' },
+    'audit_desc': { es: 'Auditoría jerárquica de BOM, Procesos y Capacidades.', en: 'Hierarchical audit of BOM, Processes, and Capacities.', fr: 'Audit hiÃ©rarchique de la nomenclature, des processus et des capacitÃ©s.', de: 'Hierarchisches Audit von StÃ¼cklisten, Prozessen und KapazitÃ¤ten.', pt: 'Auditoria hierÃ¡rquica de BOM, Processos e Capacidades.', zh: 'BOMã€æµç¨‹å’Œäº§èƒ½çš„åˆ†å±‚å®¡æ ¸ã€‚' },
+    'no_shift_alert': { es: 'ALERTA: Hay equipos sin turno asignado', en: 'ALERT: There are units without an assigned shift', fr: 'ALERTE : Il y a des unitÃ©s sans Ã©quipe assignÃ©e', de: 'ALARM: Es gibt Einheiten ohne zugewiesene Schicht', pt: 'ALERTA: HÃ¡ equipes sem turno atribuÃ­do', zh: 'è­¦å‘Šï¼šå­˜åœ¨æœªåˆ†é…ç­æ¬¡çš„å•å…ƒ' },
+    'visual': { es: 'Visual', en: 'Visual', fr: 'Visuel', de: 'Visuell', pt: 'Visual', zh: 'è§†è§‰' },
+    'tab_tables': { es: 'Tablas', en: 'Tables', fr: 'Tableaux', de: 'Tabellen', pt: 'Tabelas', zh: 'è¡¨æ ¼' },
+    'source': { es: 'Origen', en: 'Source', fr: 'Source', de: 'Quelle', pt: 'Origem', zh: 'æ¥æº' },
+    'results': { es: 'Resultados', en: 'Results', fr: 'RÃ©sultats', de: 'Ergebnisse', pt: 'Resultados', zh: 'ç»“æžœ' },
+    'quick_search': { es: 'Búsqueda rápida en tablas...', en: 'Quick table search...', fr: 'Recherche rapide...', de: 'Schnellsuche...', pt: 'Busca rÃ¡pida...', zh: 'å¿«é€Ÿè¡¨æ ¼æœç´¢...' },
+    'reprogrammable': { es: 'Se puede reprogramar', en: 'Reprogrammable', fr: 'Reprogrammable', de: 'Umprogrammierbar', pt: 'ReprogramÃ¡vel', zh: 'å¯é‡æ–°æŽ’ç¨‹' },
+    'planning_params': { es: 'ParÃ¡metros de PlanificaciÃ³n', en: 'Planning Parameters', fr: 'ParamÃ¨tres de PlanificaciÃ³n', de: 'Planungsparameter', pt: 'ParÃ¢metros de Planejamento', zh: 'è®¡åˆ’å‚æ•°' },
+    'item_moq': { es: 'Lote Mínimo de Compra (MOQ)', en: 'Min Purchase Lot (MOQ)', fr: 'Lot Minimum d\'Achat (MOQ)', de: 'Mindestbestellmenge (MOQ)', pt: 'Lote Mínimo de Compra (MOQ)', zh: 'æœ€å°é‡‡è´­æ‰¹é‡ (MOQ)' },
+    'moq_desc': { es: 'Este valor define la cantidad mÃ­nima que el motor APS sugerirÃ¡ comprar cuando se detecte una quiebra de stock.', en: 'This value defines the minimum quantity the APS engine will suggest purchasing when a stockout is detected.', fr: 'Cette valeur dÃ©finit la quantitÃ© minimale que le moteur APS suggÃ©rera d\'acheter lorsqu\'une rupture de stock est dÃ©tectÃ©e.', de: 'Dieser Wert definiert die Mindestmenge, die die APS-Engine zum Kauf vorschlÃ¤gt, wenn ein Lagerengpass festgestellt wird.', pt: 'Este valor define a quantidade mÃ­nima que o motor APS sugerirÃ¡ comprar cuando for detectada uma ruptura de estoque.', zh: 'æ­¤å€¼å®šä¹‰äº†æ£€æµ‹åˆ°ç¼ºè´§æ—¶ APS å¼•æ“Žå»ºè®®è´­ä¹°çš„æœ€å°æ•°é‡ã€‚' },
+    'safety_stock': { es: 'Stock Seguridad', en: 'Safety Stock', fr: 'Stock de SÃ©curitÃ©', de: 'Sicherheitsbestand', pt: 'Estoque de Seguridad', zh: 'å®‰å…¨åº“å­˜' },
+    'lead_time': { es: 'Lead Time (DÃ­as)', en: 'Lead Time (Days)', fr: 'DÃ©lai (Jours)', de: 'Durchlaufzeit (Tage)', pt: 'Lead Time (Dias)', zh: 'æå‰æœŸï¼ˆå¤©ï¼‰' },
+    'stock_info': { es: 'Información de Stock', en: 'Stock Info', fr: 'Info Stock', de: 'Bestandsinfo', pt: 'InformaÃ§Ãµes de Estoque', zh: 'åº“å­˜ä¿¡æ¯' },
+    'current_stock': { es: 'Stock Actual', en: 'Current Stock', fr: 'Stock Actuel', de: 'Aktueller Bestand', pt: 'Estoque Atual', zh: 'å½“å‰åº“å­˜' },
+    'item_type': { es: 'Tipo de Item', en: 'Item Type', fr: 'Type d\'Article', de: 'Artikeltyp', pt: 'Tipo de Item', zh: 'é¡¹ç›®ç±»åž‹' },
+    'unit_cost': { es: 'Costo Unitario', en: 'Unit Cost', fr: 'CoÃ»t Unitaire', de: 'StÃ¼ckkosten', pt: 'Custo UnitÃ¡rio', zh: 'å•ä½æˆæœ¬' },
+    'availability_shifts': { es: 'Disponibilidad y Turnos', en: 'Availability and Shifts', fr: 'DisponibilitÃ© et Ã‰quipes', de: 'VerfÃ¼gbarkeit und Schichten', pt: 'Disponibilidad e Turnos', zh: 'å¯ç”¨æ€§å’Œç­æ¬¡' },
+    'assigned_shift': { es: 'Turno de Trabajo Asignado', en: 'Assigned Work Shift', fr: 'Ã‰quipe de Travail AssignÃ©e', de: 'Zugewiesene Arbeitsschicht', pt: 'Turno de Trabajo AtribuÃ­do', zh: 'åˆ†é…çš„å·¥ä½œç­æ¬¡' },
+    'select_shift': { es: 'Seleccionar Turno...', en: 'Select Shift...', fr: 'SÃ©lectionner Ã‰quipe...', de: 'Schicht AuswÃ¤hlen...', pt: 'Selecionar Turno...', zh: 'é€‰æ‹©ç­æ¬¡...' },
+    'free_from_shifts': { es: 'Liberar de Turnos (24 Horas)', en: 'Free from Shifts (24 Hours)', fr: 'LibÃ©rÃ© des Ã‰quipes (24 Heures)', de: 'Schichtfrei (24 Stunden)', pt: 'Liberar de Turnos (24 Horas)', zh: 'å…é™¤ç­æ¬¡ï¼ˆ24 å°æ—¶ï¼‰' },
+    'continuous_plan_desc': { es: 'Ignora el calendario de turnos y permite planificaciÃ³n continua.', en: 'Ignore shift calendar and allow continuous planning.', fr: 'Ignore le calendario des equipes et permite une planification continue.', de: 'Schichtkalender ignorieren und kontinuierliche Planung ermÃ¶glichen.', pt: 'Ignora o calendÃ¡rio de turnos e permite planejamento contÃ­nuo.', zh: 'å¿½ç•¥ç­æ¬¡æ—¥åŽ†å¹¶å…è®¸è¿žç»­è®¡åˆ’ã€‚' },
+    'technical_params': { es: 'ParÃ¡metros TÃ©cnicos', en: 'Technical Parameters', fr: 'ParamÃ¨tres Techniques', de: 'Technische Parameter', pt: 'ParÃ¢metros TÃ©cnicos', zh: 'æŠ€æœ¯å‚æ•°' },
+    'max_daily_capacity': { es: 'Capacidad MÃ¡xima Diaria', en: 'Max Daily Capacity', fr: 'CapacitÃ© Quotidienne Max', de: 'Maximale TageskapazitÃ¤t', pt: 'Capacidad MÃ¡xima DiÃ¡ria', zh: 'æœ€å¤§æ—¥äº§èƒ½' },
+    'formula_components': { es: 'Componentes de la FÃ³rmula', en: 'Formula Components', fr: 'Composants de la Formule', de: 'Formelkomponenten', pt: 'Componentes da FÃ³rmula', zh: 'é…æ–¹ç»„ä»¶' },
+    'component': { es: 'Componente', en: 'Component', fr: 'Composant', de: 'Komponente', pt: 'Componente', zh: 'ç»„ä»¶' },
+    'required_qty': { es: 'Cantidad Requerida', en: 'Required Quantity', fr: 'QuantitÃ© Requise', de: 'Erforderliche Menge', pt: 'Quantidade Requerida', zh: 'æ‰€éœ€æ•°é‡' },
+    'where_used': { es: 'Uso en FÃ³rmulas (Where Used)', en: 'Where Used (BOM)', fr: 'Cas d\'Emploi (BOM)', de: 'Verwendungsnachweis (StÃ¼ckliste)', pt: 'Uso em FÃ³rmulas (Where Used)', zh: 'ç”¨é€”ï¼ˆWhere Usedï¼‰' },
+    'parent_product': { es: 'Producto Padre', en: 'Parent Product', fr: 'Produit Parent', de: 'Ãœbergeordnetes Produkt', pt: 'Produto Pai', zh: 'çˆ¶çº§äº§å“' },
+    'qty_in_formula': { es: 'Cantidad en FÃ³rmula', en: 'Qty in Formula', fr: 'QtÃ© dans la Formule', de: 'Menge in Formel', pt: 'Cantidad na FÃ³rmula', zh: 'é…æ–¹ä¸­çš„æ•°é‡' },
+    'not_in_any_formula': { es: 'Este artÃ­culo no se utiliza en ninguna fÃ³rmula conocida.', en: 'This item is not used in any known formula.', fr: 'Cet article n\'est utilisÃ© dans aucune formule connue.', de: 'Dieser Artikel wird in keiner bekannten Formel verwendet.', pt: 'Este item nÃ£o Ã© usado em nenhuma fÃ³rmula conhecida.', zh: 'æ­¤é¡¹ç›®æœªåœ¨ä»»ä½•å·²çŸ¥é…æ–¹ä¸­ä½¿ç”¨ã€‚' },
+    'integrated_machinery': { es: 'Maquinaria Integrada', en: 'Integrated Machinery', fr: 'Machines IntÃ©grÃ©es', de: 'Integrierte Maschinen', pt: 'Maquinaria Integrada', zh: 'é›†æˆæœºæ¢°' },
+    'machine_id': { es: 'ID MÃ¡quina', en: 'Machine ID', fr: 'ID Machine', de: 'Maschinen-ID', pt: 'ID da MÃ¡quina', zh: 'æœºå™¨ ID' },
+    'name_denomination': { es: 'Nombre / DenominaciÃ³n', en: 'Name / Designation', fr: 'Nom / DÃ©signation', de: 'Name / Bezeichnung', pt: 'Nombre / DenominaÃ§Ã£o', zh: 'åç§° / åç§°' },
+    'active': { es: 'Activa', en: 'Active', fr: 'Active', de: 'Aktiv', pt: 'Ativa', zh: 'å¯ç”¨' },
+    'no_machines_assigned': { es: 'Este centro no tiene mÃ¡quinas asignadas.', en: 'This center has no assigned machines.', fr: 'Ce centre n\'a pas de machines assignÃ©es.', de: 'Diesem Zentrum sind keine Maschinen zugewiesen.', pt: 'Este centro nÃ£o tem mÃ¡quinas atribuÃ­das.', zh: 'æ­¤ä¸­å¿ƒæ²¡æœ‰åˆ†é…çš„æœºå™¨ã€‚' },
+    'material_explosion': { es: 'Materiales Requeridos (ExplosiÃ³n)', en: 'Required Materials (Explosion)', fr: 'MatÃ©riaux Requis (Explosion)', de: 'Erforderliche Materialien (StÃ¼cklistenauflÃ¶sung)', pt: 'Materiais Requeridos (ExplosÃ£o)', zh: 'æ‰€éœ€ææ–™ï¼ˆåˆ†è§£ï¼‰' },
+    'product_routing': { es: 'Hoja de Ruta del Producto', en: 'Product Routing', fr: 'Gamme de Fabrication', de: 'Arbeitsplan des Produkts', pt: 'Boteiro do Produto', zh: 'äº§å“å·¥è‰ºè·¯çº¿' },
+    'machines_with_shift': { es: 'MÃ¡quinas con este Turno', en: 'Machines with this Shift', fr: 'Machines avec cette Ã‰quipe', de: 'Maschinen mit dieser Schicht', pt: 'MÃ¡quinas com este Turno', zh: 'å…·æœ‰æ­¤ç­æ¬¡çš„æœºå™¨' },
+    'no_machines_this_shift': { es: 'No hay mÃ¡quinas asignadas a este turno.', en: 'No machines assigned to this shift.', fr: 'Aucune machine assignÃ©e Ã  cette Ã©quipe.', de: 'Keine Maschinen fÃ¼r diese Schicht zugewiesen.', pt: 'NÃ£o hÃ¡ mÃ¡quinas atribuÃ­das a este turno.', zh: 'æ²¡æœ‰åˆ†é…åˆ°æ­¤ç­æ¬¡çš„æœºå™¨ã€‚' },
+    'maint_plan_detail': { es: 'Detalle del Plan de Mantenimiento', en: 'Maintenance Plan Detail', fr: 'DÃ©tail du Plan de Maintenance', de: 'Wartungsplandetail', pt: 'Detalhe do Plano de ManutenÃ§Ã£o', zh: 'ç»´æŠ¤è®¡åˆ’è¯¦æƒ…' },
+    'affects_to': { es: 'Afecta a:', en: 'Affects:', fr: 'Affecte :', de: 'Betrifft:', pt: 'Afeta:', zh: 'å½±å“ï¼š' },
+    'work_description': { es: 'DescripciÃ³n del Trabajo:', en: 'Work Description:', fr: 'Description du Travail :', de: 'Arbeitsbeschreibung:', pt: 'DescriÃ§Ã£o do Trabajo:', zh: 'å·¥ä½œæè¿°ï¼š' },
+    'no_tech_desc': { es: 'Sin descripción técnica disponible.', en: 'No technical description available.', fr: 'Aucune description technique disponible.', de: 'Keine technische Beschreibung verfÃ¼gbar.', pt: 'Nenhuma descripción técnica disponible.', zh: 'æ²¡æœ‰å¯ç”¨çš„æŠ€æœ¯æè¿°ã€‚' },
+    'op_sequence_title': { es: 'Secuencia de Operaciones (Hoja de Ruta)', en: 'Sequence of Operations (Routing)', fr: 'SÃ©quence d\'OpÃ©rations (Gamme)', de: 'Operationssequenz (Arbeitsplan)', pt: 'SequÃªncia de OperaÃ§Ãµes (Roteiro)', zh: 'å·¥åºé¡ºåºï¼ˆå·¥è‰ºè·¯çº¿ï¼‰' },
+    'setup_time': { es: 'Setup (Min)', en: 'Setup (Min)', fr: 'RÃ©glage (Min)', de: 'RÃ¼stzeit (Min)', pt: 'Setup (Min)', zh: '设置ï¼ˆåˆ†é’Ÿï¼‰' },
+    'run_time': { es: 'Run (Min/Un)', en: 'Run (Min/Un)', fr: 'ExÃ©cution (Min/Un)', de: 'Laufzeit (Min/Einheit)', pt: 'Run (Min/Un)', zh: 'è¿è¡Œï¼ˆåˆ†é’Ÿ/å•ä½ï¼‰' },
+    'no_routing_ops': { es: 'No hay operaciones de ruteo para este artÃ­culo.', en: 'No routing operations for this item.', fr: 'Aucune opÃ©ration de gamme pour cet article.', de: 'Keine Arbeitsplanoperationen fÃ¼r diesen Artikel.', pt: 'NÃ£o hÃ¡ operaÃ§Ãµes de roteiro para este item.', zh: 'æ­¤é¡¹ç›®çš„å·¥è‰ºè·¯çº¿ä¸­æ²¡æœ‰æ“ä½œã€‚' },
+    'syncing_engineering': { es: 'Sincronizando IngenierÃ­a...', en: 'Syncing Engineering...', fr: 'Synchronisation de l\'IngÃ©nierie...', de: 'Synchronisierung der Technik...', pt: 'Sincronizando Engenharia...', zh: 'æ­£åœ¨åŒæ­¥å·¥ç¨‹...' },
+    'items_tab': { es: 'ArtÃ­culos', en: 'Items', fr: 'Articles', de: 'Artikel', pt: 'Itens', zh: 'é¡¹ç›®' },
+    'demand_tab': { es: 'Demanda (Pedidos)', en: 'Demand (Orders)', fr: 'Demande (Commandes)', de: 'Bedarf (AuftrÃ¤ge)', pt: 'Demanda (Pedidos)', zh: 'éœ€æ±‚ï¼ˆè®¢å•ï¼‰' },
+    'erp_purchases_tab': { es: 'Compras ERP', en: 'ERP Purchases', fr: 'Achats ERP', de: 'ERP-EinkÃ¤ufe', pt: 'Compras ERP', zh: 'ERP é‡‡è´­' },
+    'structure_bom_tab': { es: 'Estructura (BOM)', en: 'Structure (BOM)', fr: 'Structure (Nomenclature)', de: 'Struktur (StÃ¼ckliste)', pt: 'Estrutura (BOM)', zh: 'ç»“æž„ (BOM)' },
+    'plants_equipment_tab': { es: 'Plantas / EQ', en: 'Plants / EQ', fr: 'Usines / EQ', de: 'Werke / EQ', pt: 'Plantas / EQ', zh: 'å·¥åŽ‚ / EQ' },
+    'flows_routings_tab': { es: 'Flujos (Rutas)', en: 'Flows (Routings)', fr: 'Flux (Gammes)', de: 'FlÃ¼sse (ArbeitsplÃ¤ne)', pt: 'Fluxos (Roteiros)', zh: 'æµç¨‹ï¼ˆå·¥è‰ºè·¯çº¿ï¼‰' },
+    'shifts_tab': { es: 'Turnos', en: 'Shifts', fr: 'Ã‰quipes', de: 'Schichten', pt: 'Turnos', zh: 'ç­æ¬¡' },
+    'maintenance_tab': { es: 'Mantenimiento', en: 'Maintenance', fr: 'Maintenance', de: 'Wartung', pt: 'ManutenÃ§Ã£o', zh: 'ç»´æŠ¤' },
+    'pwo_proposals_tab': { es: 'Propuestas OP', en: 'WO Proposals', fr: 'Propositions OF', de: 'FA-VorschlÃ¤ge', pt: 'Propostas OP', zh: 'å·¥å•å»ºè®®' },
+    'ppo_proposals_tab': { es: 'Propuestas OC', en: 'PO Proposals', fr: 'Propositions BC', de: 'BE-VorschlÃ¤ge', pt: 'Propostas OC', zh: 'é‡‡è´­è®¢å•å»ºè®®' },
+
+    // Analytics
+    'intelligence_analytics': { es: 'Inteligencia AnalÃ­tica', en: 'Intelligence Analytics', fr: 'Intelligence Analytique', de: 'Analytische Intelligenz', pt: 'Inteligência AnalÃ­tica', zh: '智能åˆ†æž' },
+    'mfg_analytics': { es: 'Manufacturing Analytics', en: 'Manufacturing Analytics', fr: 'Analyse de Fabrication', de: 'Fertigungsanalyse', pt: 'AnÃ¡lise de Manufatura', zh: 'åˆ¶é€ åˆ†æž' },
+    'deep_analysis_desc': { es: 'Deep data analysis and predictive performance metrics.', en: 'Deep data analysis and predictive performance metrics.', fr: 'Analyse approfondie des donnÃ©es et mesures de performance prÃ©dictives.', de: 'Tiefgehende Datenanalyse und prÃ¤diktive Leistungskennzahlen.', pt: 'AnÃ¡lise profunda de dados e mÃ©tricas de desempeÃ±o preditivo.', zh: 'æ·±åº¦æ•°æ®åˆ†æžå’Œé¢„æµ‹æ€§èƒ½æŒ‡æ ‡ã€‚' },
+    'plant_performance': { es: 'Rendimiento de Planta', en: 'Plant Performance', fr: 'Performance de l\'Usine', de: 'Anlagenleistung', pt: 'Desempenho da Planta', zh: 'å·¥åŽ‚ç»©æ•ˆ' },
+    'planned': { es: 'Previsto', en: 'Planned', fr: 'PrÃ©vu', de: 'Geplant', pt: 'Previsto', zh: 'è®¡åˆ’' },
+    'real': { es: 'Real', en: 'Real', fr: 'RÃ©el', de: 'Real', pt: 'Real', zh: 'å®žé™…' },
+    'predictive_trend_chart': { es: 'GrÃ¡fica de Tendencia Predictiva', en: 'Predictive Trend Chart', fr: 'Graphique de Tendance PrÃ©dictif', de: 'PrÃ¤diktives Trenddiagramm', pt: 'GrÃ¡fico de TendÃªncia Preditiva', zh: 'é¢„æµ‹è¶‹åŠ¿å›¾' },
+    'demand_mix': { es: 'Mix de Demanda', en: 'Demand Mix', fr: 'Mix de Demande', de: 'Nachfragemix', pt: 'Mix de Demanda', zh: 'éœ€æ±‚ç»“æž„' },
+    'standard': { es: 'EstÃ¡ndar', en: 'Standard', fr: 'Standard', de: 'Standard', pt: 'PadrÃ£o', zh: 'æ ‡å‡†' },
+    'urgent': { es: 'Urgente', en: 'Urgent', fr: 'Urgent', de: 'Dringend', pt: 'Urgente', zh: 'ç´§æ€¥' },
+    'special': { es: 'Especial', en: 'Special', fr: 'SpÃ©cial', de: 'Spezial', pt: 'Especial', zh: 'ç‰¹æ®Š' },
+    'mix_efficiency_impact': {
+        es: 'El mix actual indica una saturaciÃ³n por Ã³rdenes urgentes que impacta la eficiencia en un {value}.',
+        en: 'The current mix indicates saturation by urgent orders impacting efficiency by {value}.',
+        fr: 'Le mix actuel indique une saturation par les commandes urgentes impactant l\'efficacitÃ© de {value}.',
+        de: 'Der aktuelle Mix deutet auf eine SÃ¤ttigung durch dringende AuftrÃ¤ge hin, die die Effizienz um {value} beeintrÃ¤chtigt.',
+        pt: 'O mix atual indica uma saturaÃ§Ã£o por ordens urgentes que impacta a eficiÃªncia em {value}.',
+        zh: 'ç›®å‰çš„ç»“æž„è¡¨æ˜Žç´§æ€¥è®¢å•å·²é¥±å’Œï¼Œå½±å“æ•ˆçŽ‡ {value}ã€‚'
+    },
+    // Outputs
+    'outputs_reports_title': { es: 'Salidas & Reportes APS', en: 'Outputs & APS Reports', fr: 'Sorties & Rapports APS', de: 'Ausgaben & APS-Berichte', pt: 'Saídas e Relatórios APS', zh: 'è¾“å‡ºå’Œ APS æŠ¥å‘Š' },
+    'mps_report_title': { es: 'Plan Maestro & Compromisos', en: 'Master Plan & Commitments', fr: 'Plan Directeur & Engagements', de: 'Masterplan & Verpflichtungen', pt: 'Plano Mestre e Compromissos', zh: 'ä¸»è®¡åˆ’å’Œæ‰¿è¯º' },
+    'mps_report_desc': { es: 'Fechas promesa (ATP/CTP) por pedido, reprogramaciones sugeridas y plan maestro de producciÃ³n (MPS).', en: 'Promise dates (ATP/CTP) by order, suggested rescheduling and production master plan (MPS).', fr: 'Dates de promesse (ATP/CTP) par commande, reprogrammation suggÃ©rÃ©e et plan directeur de production (MPS).', de: 'Zusagedaten (ATP/CTP) nach Auftrag, vorgeschlagene Umplanung und Produktionsmasterplan (MPS).', pt: 'Datas prometidas (ATP/CTP) por pedido, reprogramaÃ§Ãµes sugeridas e plano mestre de produÃ§Ã£o (MPS).', zh: 'æŒ‰è®¢å•æŽ’åˆ—çš„æ‰¿è¯ºæ—¥æœŸ (ATP/CTP)ã€å»ºè®®çš„é‡æ–°æŽ’ç¨‹å’Œç”Ÿäº§ä¸»è®¡åˆ’ (MPS)ã€‚' },
+    'detailed_prod_title': { es: 'ProducciÃ³n Detallada', en: 'Detailed Production', fr: 'Production DÃ©taillÃ©e', de: 'Detaillierte Produktion', pt: 'ProduÃ§Ã£o Detalhada', zh: 'è¯¦ç»†ç”Ÿäº§' },
+    'detailed_prod_desc': { es: 'Ã“rdenes de fabricaciÃ³n, secuenciaciÃ³n por mÃ¡quina, asignaciÃ³n de recursos y carga por turno.', en: 'Manufacturing orders, machine sequencing, resource allocation and shift load.', fr: 'Ordres de fabrication, sÃ©quenÃ§age des machines, allocation des ressources et charge par Ã©quipe.', de: 'FertigungsauftrÃ¤ge, Maschinensequenzierung, Ressourcenzuweisung und Schichtauslastung.', pt: 'Ordens de fabricaÃ§Ã£o, sequenciamento de mÃ¡quinas, alocaÃ§Ã£o de recursos e carga por turno.', zh: 'åˆ¶é€ è®¢å•ã€æœºå™¨é¡ºåºã€èµ„æºåˆ†é…å’Œç­æ¬¡è´Ÿè·ã€‚' },
+    'materials_supply_title': { es: 'Materiales & Supply', en: 'Materials & Supply', fr: 'MatÃ©riaux & Approvisionnement', de: 'Materialien & Beschaffung', pt: 'Materiais e Suprimentos', zh: 'ææ–™å’Œä¾›åº”' },
+    'materials_supply_desc': { es: 'Requerimientos netos MRP, sugerencias de compra y fechas de liberaciÃ³n recomendadas.', en: 'Net MRP requirements, purchase suggestions and recommended release dates.', fr: 'Besoins MRP nets, suggestions d\'achat et dates de sortie recommandÃ©es.', de: 'Netto-MRP-Anforderungen, Kaufempfehlungen und empfohlene Freigabetermine.', pt: 'Requisitos lÃ­quidos de MRP, sugestÃµes de compra e datas de lanÃ§amento recomendadas.', zh: 'å‡€ MRP éœ€æ±‚ã€é‡‡è´­å»ºè®®å’ŒæŽ¨èçš„å‘å¸ƒæ—¥æœŸã€‚' },
+    'dispatch_work_title': { es: 'Trabajo para Planta', en: 'Plant Work', fr: 'Travail de l\'Usine', de: 'Anlagenarbeit', pt: 'Trabalho de Planta', zh: 'å·¥åŽ‚å·¥ä½œ' },
+    'dispatch_work_desc': { es: 'Listas de despacho por estaciÃ³n, hojas de ruta para el operador y kitting de insumos necesarios.', en: 'Station dispatch lists, operator routings and kitting of required inputs.', fr: 'Listes d\'expÃ©dition par station, gammes d\'opÃ©rateurs et kitting des intrants requis.', de: 'Stationsversandlisten, Bedienerrouten und Kitting der erforderlichen Eingaben.', pt: 'Listas de despacho por estaÃ§Ã£o, roteiros de operador e kitting de insumos necesarios.', zh: 'å·¥ç«™åˆ†é…åˆ—è¡¨ã€æ“ä½œå‘˜å·¥è‰ºè·¯çº¿å’Œæ‰€éœ€è¾“å…¥çš„é…å¥—ã€‚' },
+    'exceptions_alerts_title': { es: 'Excepciones & Alertas', en: 'Exceptions & Alerts', fr: 'Exceptions & Alertes', de: 'Ausnahmen & Alarme', pt: 'ExceÃ§Ãµes e Alertas', zh: 'å¼‚å¸¸å’Œè­¦æŠ¥' },
+    'exceptions_alerts_desc': { es: 'IdentificaciÃ³n de cuellos de botella, pedidos en riesgo de retraso y quiebras de stock crÃ­ticas.', en: 'Identification of bottlenecks, orders at risk of delay and critical stockouts.', fr: 'Identification des goulots d\'Ã©tranglement, des commandes prÃ©sentant un risque de retard et des ruptures de stock critiques.', de: 'Identifizierung von EngpÃ¤ssen, verzÃ¶gerungsgefÃ¤hrdeten AuftrÃ¤gen und kritischen FehlbestÃ¤nden.', pt: 'IdentificaÃ§Ã£o de gargalos, pedidos em risco de atraso e faltas de estoque crÃ­ticas.', zh: 'è¯†åˆ«ç“¶é¢ˆã€æœ‰å»¶è¿Ÿé£Žé™©çš„è®¢å•å’Œå…³é”®ç¼ºè´§ã€‚' },
+    'performance_costs_title': { es: 'Performance & Costos', en: 'Performance & Costs', fr: 'Performance & CoÃ»ts', de: 'Leistung & Kosten', pt: 'Desempenho e Custos', zh: 'ç»©æ•ˆå’Œæˆæœ¬' },
+    'performance_costs_desc': { es: 'Indicadores clave de desempeÃ±o (KPIs), eficiencia del plan, utilizaciÃ³n de mÃ¡quinas y costos proyectados.', en: 'Key performance indicators (KPIs), plan efficiency, machine utilization and projected costs.', fr: 'Indicateurs clÃ©s de performance (KPI), efficacitÃ© du plan, utilisation des machines et coÃ»ts proyectÃ©s.', de: 'Key Performance Indicators (KPIs), Planeffizienz, Maschinenauslastung und prognostizierte Kosten.', pt: 'Indicadores-chave de desempenho (KPIs), eficiÃªncia do plano, utilizaÃ§Ã£o de mÃ¡quinas e custos projetados.', zh: 'å…³é”®ç»©æ•ˆæŒ‡æ ‡ (KPI)ã€è®¡åˆ’æ•ˆçŽ‡ã€æœºå™¨åˆ©ç”¨çŽ‡å’Œé¢„è®¡æˆæœ¬ã€‚' },
+    'order_ref': { es: 'Orden (Ref)', en: 'Order (Ref)', fr: 'Commande (RÃ©f)', de: 'Auftrag (Ref)', pt: 'Ordem (Ref)', zh: 'è®¢å• (å‚è€ƒ)' },
+    'promise_date_aps': { es: 'Fecha Promesa (APS)', en: 'Promise Date (APS)', fr: 'Date de Promesse (APS)', de: 'Zusagetermin (APS)', pt: 'Data Prometida (APS)', zh: 'æ‰¿è¯ºæ—¥æœŸ (APS)' },
+    'firm': { es: 'Firme', en: 'Firm', fr: 'Ferme', de: 'Fest', pt: 'Firme', zh: 'æ­£å¼' },
+    'proposal': { es: 'Propuesta', en: 'Proposal', fr: 'Proposition', de: 'Vorschlag', pt: 'Proposta', zh: 'å»ºè®®' },
+    'seq_column': { es: 'Sec.', en: 'Seq.', fr: 'SÃ©c.', de: 'Seq.', pt: 'Seq.', zh: 'é¡ºåº' },
+    'order_machine': { es: 'Orden / MÃ¡quina', en: 'Order / Machine', fr: 'Commande / Machine', de: 'Auftrag / Maschine', pt: 'Ordem / MÃ¡quina', zh: 'è®¢å• / æœºå™¨' },
+    'start_end_time': { es: 'Horario Inicio/Fin', en: 'Start/End Time', fr: 'Heure de DÃ©but/Fin', de: 'Start-/Endzeit', pt: 'HorÃ¡rio InÃ­cio/Fim', zh: 'å¼€å§‹/ç»“æŸæ—¶é—´' },
+    'lock_column': { es: 'Candado', en: 'Lock', fr: 'Verrou', de: 'Sperre', pt: 'Cadeado', zh: 'é”å®š' },
+    'input_qty_req': { es: 'Cant. Requerida', en: 'Qty Required', fr: 'QtÃ© Requise', de: 'Erf. Menge', pt: 'Qtd. Requerida', zh: 'æ‰€éœ€æ•°é‡' },
+    'min_lot_qty': { es: 'Cant. Lote MÃ­n.', en: 'Min Lot Qty', fr: 'QtÃ© Lot Min', de: 'Min. LosgrÃ¶ÃŸe', pt: 'Qtd. Lote MÃ­n.', zh: 'æœ€å°æ‰¹é‡' },
+    'kitting_title': { es: 'Dispatch List & Hoja de Kitting', en: 'Dispatch List & Kitting Sheet', fr: 'Liste d\'ExpÃ©dition & Feuille de Kitting', de: 'Versandliste & Kitting-Blatt', pt: 'Lista de Despacho e Folha de Kitting', zh: 'åˆ†é…åˆ—è¡¨å’Œé…å¥—å•' },
+    'pending_ops': { es: '{count} Ops Pendientes', en: '{count} Pending Ops', fr: '{count} Ops en Attente', de: '{count} Ausstehende Operationen', pt: '{count} Ops Pendentes', zh: '{count} ä¸ªå¾…å®šæ“ä½œ' },
+    'kitting_components': { es: 'Kitting (Componentes)', en: 'Kitting (Components)', fr: 'Kitting (Composants)', de: 'Kitting (Komponenten)', pt: 'Kitting (Componentes)', zh: 'é…å¥—ï¼ˆç»„ä»¶ï¼‰' },
+    'no_components_italic': { es: 'Sin componentes', en: 'No components', fr: 'Sans composants', de: 'Keine Komponenten', pt: 'Sem componentes', zh: 'æ— ç»„ä»¶' },
+    'late_orders_title': { es: 'Pedidos con Riesgo de Retraso', en: 'Orders at Risk of Delay', fr: 'Commandes avec Risque de Retard', de: 'AuftrÃ¤ge mit VerzÃ¶gerungsrisiko', pt: 'Pedidos com Risco de Atraso', zh: 'æœ‰å»¶è¿Ÿé£Žé™©çš„è®¢å•' },
+    'promised_aps_dates': { es: 'Fec. Prometida: {promised} | Fec. APS: {aps}', en: 'Promised: {promised} | APS: {aps}', fr: 'Promis : {promised} | APS : {aps}', de: 'Zugesagt: {promised} | APS: {aps}', pt: 'Data Prometida: {promised} | Data APS: {aps}', zh: 'æ‰¿è¯ºï¼š{promised} | APSï¼š{aps}' },
+    'days_delay': { es: '+{days} DÃ­as', en: '+{days} Days', fr: '+{days} Jours', de: '+{days} Tage', pt: '+{days} Dias', zh: '+{days} å¤©' },
+    'estimated_delay': { es: 'Demora Estimada', en: 'Estimated Delay', fr: 'Retard EstimÃ©', de: 'GeschÃ¤tzte VerzÃ¶gerung', pt: 'Atraso Estimado', zh: 'é¢„è®¡å»¶è¿Ÿ' },
+    'no_late_orders': { es: 'Â¡No hay pedidos retrasados en este escenario!', en: 'No late orders in this scenario!', fr: 'Pas de commandes en retard dans ce scÃ©nario !', de: 'Keine verspÃ¤teten AuftrÃ¤ge in diesem Szenario!', pt: 'NÃ£o hÃ¡ pedidos atrasados neste cenÃ¡rio!', zh: 'æ­¤åœºæ™¯ä¸­æ²¡æœ‰å»¶è¿Ÿè®¢å•ï¼' },
+    'bottlenecks_title': { es: 'Cuellos de Botella (Sobrecarga)', en: 'Bottlenecks (Overload)', fr: 'Goulots d\'Ã‰tranglement (Surcharge)', de: 'EngpÃ¤sse (Ãœberlastung)', pt: 'Gargalos (Sobrecarga)', zh: 'ç“¶é¢ˆï¼ˆè¿‡è½½ï¼‰' },
+    'projected_load': { es: 'Carga Proyectada: {hours} Horas', en: 'Projected Load: {hours} Hours', fr: 'Charge ProjetÃ©e : {hours} Heures', de: 'Prognostizierte Last: {hours} Stunden', pt: 'Carga Projetada: {hours} Horas', zh: 'é¢„è®¡è´Ÿè·ï¼š{hours} å°æ—¶' },
+    'total_prod_time': { es: 'Tiempo Total de ProducciÃ³n', en: 'Total Production Time', fr: 'Temps Total de Production', de: 'Gesamtproduktionszeit', pt: 'Tiempo Total de ProduÃ§Ã£o', zh: 'æ€»ç”Ÿäº§æ—¶é—´' },
+    'avg_lead_time_mfg': { es: 'Lead Time Promedio (MFG)', en: 'Average Lead Time (MFG)', fr: 'DÃ©lai Moyen (MFG)', de: 'Durchschnittliche Durchlaufzeit (MFG)', pt: 'Lead Time MÃ©dio (MFG)', zh: 'å¹³å‡æå‰æœŸ (MFG)' },
+    'total_scheduled_ops': { es: 'Ops. Programadas Totales', en: 'Total Scheduled Ops', fr: 'Total des Ops ProgrammÃ©es', de: 'Gesamtzahl der geplanten Operationen', pt: 'Total de Ops Programadas', zh: 'é¢„å®šæ“ä½œæ€»æ•°' },
+    'capacity_dist_plant': { es: 'DistribuciÃ³n de Capacidad por Planta', en: 'Capacity Distribution by Plant', fr: 'Distribution de CapacitÃ© par Usine', de: 'KapazitÃ¤tsverteilung nach Werk', pt: 'DistribuiÃ§Ã£o de Capacidade por Planta', zh: 'å·¥åŽ‚äº§èƒ½åˆ†å¸ƒ' },
+    'module_in_dev': { es: 'MÃ³dulo en Desarrollo', en: 'Module in Development', fr: 'Module en DÃ©veloppement', de: 'Modul in der Entwicklung', pt: 'MÃ³dulo em Desenvolvimento', zh: 'æ¨¡å—å¼€å‘ä¸­' },
+    'view_real_report': { es: 'Ver Reporte Real', en: 'View Real Report', fr: 'Voir Rapport RÃ©el', de: 'Echten Bericht anzeigen', pt: 'Ver RelatÃ³rio Real', zh: 'æŸ¥çœ‹çœŸå®žæŠ¥å‘Š' },
+    'export_full_csv': { es: 'Exportar CSV Completo', en: 'Export Full CSV', fr: 'Exporter CSV Complet', de: 'VollstÃ¤ndiges CSV exportieren', pt: 'Exportar CSV Completo', zh: 'å¯¼å‡ºå®Œæ•´ CSV' },
+    'processing_real_data': { es: 'Procesando Datos Reales...', en: 'Processing Real Data...', fr: 'Traitement des DonnÃ©es RÃ©elles...', de: 'Verarbeitung echter Daten...', pt: 'Processando Dados Reais...', zh: 'æ­£åœ¨å¤„ç†çœŸå®žæ•°æ®...' },
+    'output_intelligence_title': { es: 'Inteligencia de Salidas Operativas', en: 'Operational Output Intelligence', fr: 'Intelligence des Sorties OpÃ©rationnelles', de: 'Operative Ausgabenauswertung', pt: 'Inteligência de SaÃ­das Operacionais', zh: 'æ“ä½œè¾“å‡ºåˆ†æž' },
+    'output_intelligence_desc': { es: 'Datos 100% reales derivados de tu Ãºltima planificaciÃ³n confirmada. Elige una categorÃ­a para ver el detalle tÃ©cnico que se enviarÃ¡ a planta o compras.', en: '100% real data derived from your last confirmed plan. Choose a category to see the technical detail that will be sent to plant or purchasing.', fr: 'DonnÃ©es 100% rÃ©elles issues de votre dernier plan confirmÃ©. Choisissez une catÃ©gorie pour voir le dÃ©tail technique qui sera envoyÃ© Ã  l\'usine ou aux achats.', de: '100 % echte Daten aus Ihrem letzten bestÃ¤tigten Plan. WÃ¤hlen Sie eine Kategorie aus, um die technischen Details anzuzeigen, die an das Werk oder den Einkauf gesendet werden.', pt: 'Dados 100% reais derivados do seu Ãºltimo plano confirmado. Escolha uma categoria para ver o detalhe tÃ©cnico que serÃ¡ enviado Ã  planta ou compras.', zh: 'æºè‡ªæ‚¨ä¸Šæ¬¡ç¡®è®¤è®¡åˆ’çš„ 100% çœŸå®žæ•°æ®ã€‚é€‰æ‹©ä¸€ä¸ªç±»åˆ«ä»¥æŸ¥çœ‹å°†å‘é€ç»™å·¥åŽ‚æˆ–é‡‡è´­çš„è¯¦ç»†æŠ€æœ¯ä¿¡æ¯ã€‚' },
+    'firm_data': { es: 'DATOS EN FIRME', en: 'FIRM DATA', fr: 'DONNÃ‰ES FERMES', de: 'FESTE DATEN', pt: 'DADOS FIRMES', zh: 'æ­£å¼æ•°æ®' },
+    'download_pdf': { es: 'Descargar PDF', en: 'Download PDF', fr: 'TÃ©lÃ©charger le PDF', de: 'PDF Herunterladen', pt: 'Baixar PDF', zh: 'ä¸‹è½½ PDF' },
+    'no_data_scenario': { es: 'Sin Datos en Escenario', en: 'No Data in Scenario', fr: 'Pas de DonnÃ©es dans le ScÃ©nario', de: 'Keine Daten im Szenario', pt: 'Sem Dados no CenÃ¡rio', zh: 'åœºæ™¯ä¸­æ— æ•°æ®' },
+    'no_records_cat_desc': { es: 'No se encontraron registros para esta categorÃ­a en la base de datos.', en: 'No records found for this category in the database.', fr: 'Aucun enregistrement trouvÃ© pour cette catÃ©gorie dans la base de donnÃ©es.', de: 'Keine DatensÃ¤tze fÃ¼r diese Kategorie in der Datenbank gefunden.', pt: 'Nenhum registro encontrado para esta categoria no banco de dados.', zh: 'æ•°æ®åº“ä¸­æœªæ‰¾åˆ°è¯¥ç±»åˆ«çš„è®°å½•ã€‚' },
+    'confidential_label': { es: 'Confidencial â€¢ Uso Interno Planta', en: 'Confidential â€¢ Plant Internal Use', fr: 'Confidentiel â€¢ Usage Interne Usine', de: 'Vertraulich â€¢ Werksinterner Gebrauch', pt: 'Confidencial â€¢ Uso Interno Planta', zh: 'æœºå¯† â€¢ å·¥åŽ‚å†…éƒ¨ä½¿ç”¨' },
+    'generated_at': { es: 'Generado: {date}', en: 'Generated: {date}', fr: 'GÃ©nÃ©rÃ© : {date}', de: 'Generiert: {date}', pt: 'Gerado: {date}', zh: 'ç”ŸæˆäºŽï¼š{date}' },
+
+    // Report Sub-items
+    'promise_dates_atp_ctp': { es: 'Fechas Promesa ATP/CTP', en: 'Promise Dates ATP/CTP', fr: 'Dates de Promesse ATP/CTP', de: 'Zusage-Daten ATP/CTP', pt: 'Datas Prometidas ATP/CTP', zh: 'æ‰¿è¯ºæ—¥æœŸ ATP/CTP' },
+    'suggested_reschedule': { es: 'Reprogramaciones Sugeridas', en: 'Suggested Rescheduling', fr: 'Reprogrammations SuggÃ©rÃ©es', de: 'Vorgeschlagene Umplanung', pt: 'ReprogramaÃ§Ãµes Sugeridas', zh: 'å»ºè®®é‡æ–°æŽ’ç¨‹' },
+    'mps_by_product': { es: 'MPS por Producto', en: 'MPS by Product', fr: 'MPS par Produit', de: 'MPS nach Produkt', pt: 'MPS por Produto', zh: 'æŒ‰äº§å“æŽ’åˆ—çš„ MPS' },
+    'resource_sequencing': { es: 'Secuenciación de Recursos', en: 'Resource Sequencing', fr: 'SÃ©quenÃ§age des Ressources', de: 'Ressourcensequenzierung', pt: 'Sequenciamento de Recursos', zh: 'èµ„æºè§„åˆ’' },
+    'detailed_dispatch_list': { es: 'Dispatch List Detallado', en: 'Detailed Dispatch List', fr: 'Liste d\'ExpÃ©dition DÃ©taillÃ©e', de: 'Detaillierte Versandliste', pt: 'Lista de Despacho Detalhada', zh: 'è¯¦ç»†åˆ†é…åˆ—è¡¨' },
+    'capacity_calendar': { es: 'Calendario de Capacidad', en: 'Capacity Calendar', fr: 'Calendrier de CapacitÃ©', de: 'KapazitÃ¤tskalender', pt: 'CalendÃ¡rio de Capacidade', zh: 'äº§èƒ½æ—¥åŽ†' },
+    'purchase_needs': { es: 'Necesidades de Compra', en: 'Purchase Needs', fr: 'Besoins d\'Achat', de: 'Einkaufsbedarf', pt: 'Necessidades de Compra', zh: 'é‡‡è´­éœ€æ±‚' },
+    'mrp_by_scenario': { es: 'MRP por Escenario', en: 'MRP by Scenario', fr: 'MRP par ScÃ©nario', de: 'MRP nach Szenario', pt: 'MRP por CenÃ¡rio', zh: 'æŒ‰åœºæ™¯æŽ’åˆ—çš„ MRP' },
+    'supply_alerts': { es: 'Alertas de Abastecimiento', en: 'Supply Alerts', fr: 'Alertes d\'Approvisionnement', de: 'Versorgungsalarme', pt: 'Alertas de Abastecimento', zh: 'ä¾›åº”è­¦æŠ¥' },
+    'op_routing_sheet': { es: 'Hoja de Ruta Operativa', en: 'Operational Routing Sheet', fr: 'Feuille de Gamme OpÃ©rationnelle', de: 'Operativer Arbeitsplan', pt: 'Folha de Roteiro Operacional', zh: 'æ“ä½œå·¥è‰ºè·¯çº¿å•' },
+    'dispatch_list_by_wc': { es: 'Dispatch List por WC', en: 'Dispatch List by WC', fr: 'Liste d\'ExpÃ©dition par WC', de: 'Versandliste nach WC', pt: 'Lista de Despacho por WC', zh: 'æŒ‰å·¥ä½œä¸­å¿ƒæŽ’åˆ—çš„åˆ†é…åˆ—è¡¨' },
+    'kitting_prep': { es: 'Preparación de Kitting', en: 'Kitting Preparation', fr: 'PrÃ©paration du Kitting', de: 'Kitting-Vorbereitung', pt: 'PreparaÃ§Ã£o de Kitting', zh: 'é…å¥—å‡†å¤‡' },
+    'delay_alerts': { es: 'Alertas de Retraso', en: 'Delay Alerts', fr: 'Alertes de Retard', de: 'VerspÃ¤tungsalarme', pt: 'Alertas de Atraso', zh: 'å»¶è¿Ÿè­¦æŠ¥' },
+    'bottleneck_identification': { es: 'Identificación de Bottlenecks', en: 'Bottleneck Identification', fr: 'Identification des Goulots', de: 'Engpassidentifikation', pt: 'IdentificaÃ§Ã£o de Gargalos', zh: 'ç“¶é¢ˆè¯†åˆ«' },
+    'supply_risks': { es: 'Riesgos de Abastecimiento', en: 'Supply Risks', fr: 'Risques d\'Approvisionnement', de: 'Versorgungsrisiken', pt: 'Riscos de Abastecimento', zh: 'ä¾›åº”é£Žé™©' },
+    'oee_theoretical_util': { es: 'OEE / Utilización Teórica', en: 'OEE / Theoretical Utilization', fr: 'OEE / Utilisation ThÃ©orique', de: 'OEE / Theoretische Auslastung', pt: 'OEE / UtilizaÃ§Ã£o TeÃ³rica', zh: 'OEE / ç†è®ºåˆ©ç”¨çŽ‡' },
+    'scenario_lead_times': { es: 'Lead Times de Escenario', en: 'Scenario Lead Times', fr: 'DÃ©lais du ScÃ©nario', de: 'Szenario-Durchlaufzeiten', pt: 'Lead Times do CenÃ¡rio', zh: 'åœºæ™¯æå‰æœŸ' },
+    'compliance_kpis': { es: 'KPIs de Cumplimiento', en: 'Compliance KPIs', fr: 'KPI de ConformitÃ©', de: 'Compliance-KPIs', pt: 'KPIs de Conformidade', zh: 'åˆè§„æ€§ KPI' },
+    'nothing_to_export': { es: 'Nada que exportar.', en: 'Nothing to export.', fr: 'Rien Ã  exporter.', de: 'Nichts zu exportieren.', pt: 'Nada para exportar.', zh: 'æ²¡æœ‰å¯å¯¼å‡ºçš„å†…å®¹ã€‚' },
+    'scheduled_operations': { es: 'Operaciones Programadas', en: 'Scheduled Operations', fr: 'OpÃ©rations ProgrammÃ©es', de: 'Geplante Operationen', pt: 'OperaÃ§Ãµes Programadas', zh: 'é¢„å®šæ“ä½œ' },
+    'in_selected_scenario': { es: 'En Escenario Seleccionado', en: 'In Selected Scenario', fr: 'Dans le ScÃ©nario SÃ©lectionnÃ©', de: 'Im ausgewÃ¤hlten Szenario', pt: 'No CenÃ¡rio Selecionado', zh: 'åœ¨é€‰å®šåœºæ™¯ä¸­' },
+    'simulating_download': { es: 'Simulando descarga de Reporte', en: 'Simulating Report download', fr: 'Simulation du tÃ©lÃ©chargement du Rapport', de: 'Download-Simulation des Berichts', pt: 'Simulando download do RelatÃ³rio', zh: '模拟æŠ¥å‘Šä¸‹è½½' },
+
+    // Auth
+    'welcome_back': { es: 'Bienvenido de nuevo', en: 'Welcome back', fr: 'Bon retour', de: 'Willkommen zurÃ¼ck', pt: 'Bem-vindo de volta', zh: 'æ¬¢è¿Žå›žæ¥' },
+    'create_account': { es: 'Crea tu cuenta', en: 'Create your account', fr: 'CrÃ©ez votre compte', de: 'Erstelle dein Konto', pt: 'Crie sua conta', zh: 'åˆ›å»ºä½ çš„è´¦æˆ·' },
+    'full_name': { es: 'Nombre Completo', en: 'Full Name', fr: 'Nom Complet', de: 'VollstÃ¤ndiger Name', pt: 'Nome Completo', zh: 'å…¨å' },
+    'email_address': { es: 'Correo ElectrÃ³nico', en: 'Email Address', fr: 'Adresse E-mail', de: 'E-Mail-Adresse', pt: 'EndereÃ§o de E-mail', zh: 'ç”µå­é‚®ä»¶åœ°å€' },
+    'password': { es: 'Contraseña', en: 'Password', fr: 'Mot de passe', de: 'Passwort', pt: 'Senha', zh: 'å¯†ç ' },
+    'login': { es: 'Entrar', en: 'Login', fr: 'Connexion', de: 'Anmelden', pt: 'Entrar', zh: 'ç™»å½•' },
+    'signup': { es: 'Registrarse', en: 'Signup', fr: 'S\'inscrire', de: 'Registrieren', pt: 'Cadastrar-se', zh: 'æ³¨å†Œ' },
+    'processing': { es: 'Procesando...', en: 'Processing...', fr: 'Traitement...', de: 'Verarbeitung...', pt: 'Processando...', zh: 'å¤„ç†ä¸­...' },
+    'no_account_signup': { es: 'Â¿No tienes cuenta? Regístrate', en: 'Don\'t have an account? Sign up', fr: 'Vous n\'avez pas de compte ? Inscrivez-vous', de: 'Kein Konto? Registrieren', pt: 'NÃ£o tem uma conta? Cadastre-se', zh: 'è¿˜æ²¡æœ‰è´¦æˆ·ï¼Ÿæ³¨å†Œ' },
+    'have_account_login': { es: 'Â¿Ya tienes cuenta? Inicia sesión', en: 'Already have an account? Log in', fr: 'Vous avez dÃ©jÃ  un compte ? Connectez-se', de: 'Hast du schon ein Konto? Einloggen', pt: 'JÃ¡ tem uma conta? FaÃ§a o login', zh: 'å·²æœ‰è´¦æˆ·ï¼Ÿç™»å½•' },
+    'registration_success': { es: 'Â¡Registrado con éxito! Comprueba tu correo para el enlace de confirmaciÃ³n.', en: 'Registered successfully! Check your email for the confirmation link.', fr: 'Inscrit avec succÃ¨s ! VÃ©rifiez votre e-mail pour le lien de confirmation.', de: 'Erfolgreich registriert! ÃœberprÃ¼fen Sie Ihre E-Mails auf den BestÃ¤tigungslink.', pt: 'Registrado com sucesso! Verifique seu e-mail para o link de confirmaÃ§Ã£o.', zh: 'æ³¨å†ŒæˆåŠŸï¼è¯·æ£€æŸ¥æ‚¨çš„ç”µå­é‚®ä»¶ä»¥èŽ·å–ç¡®è®¤é“¾æŽ¥ã€‚' },
+
+    // Alerts and Notifications
+    'manual_adjustments_reset': { es: 'Ajustes manuales eliminados. El escenario ha sido recalculado.', en: 'Manual adjustments removed. The scenario has been recalculated.', fr: 'Ajustements manuels supprimÃ©s. Le scÃ©nario a Ã©tÃ© recalculÃ©.', de: 'Manuelle Anpassungen entfernt. Das Szenario wurde neu berechnet.', pt: 'Ajustes manuais removidos. O cenÃ¡rio foi recalculado.', zh: 'æ‰‹åŠ¨è°ƒæ•´å·²åˆ é™¤ã€‚åœºæ™¯å·²é‡æ–°è®¡ç®—ã€‚' },
+    'error_reset_scenario': { es: 'Error al resetear el escenario.', en: 'Error resetting the scenario.', fr: 'Erreur lors de la rÃ©initialisation du scÃ©nario.', de: 'Fehler beim ZurÃ¼cksetzen des Szenarios.', pt: 'Erro ao resetar o cenÃ¡rio.', zh: 'é‡ç½®åœºæ™¯æ—¶å‡ºé”™ã€‚' },
+    'error_delete': { es: 'Error al borrar.', en: 'Error deleting.', fr: 'Erreur lors de la suppression.', de: 'Fehler beim LÃ¶schen.', pt: 'Erro ao excluir.', zh: 'åˆ é™¤æ—¶å‡ºé”™ã€‚' },
+    'error_no_op_id': { es: 'Error: La operaciÃ³n no tiene ID. Intenta refrescar.', en: 'Error: The operation has no ID. Try refreshing.', fr: 'Erreur : L\'opÃ©ration n\'a pas d\'ID. Essayez d\'actualiser.', de: 'Fehler: Die Operation hat keine ID. Versuchen Sie es mit Aktualisieren.', pt: 'Erro: A operaÃ§Ã£o nÃ£o possui ID. Tente atualizar.', zh: 'é”™è¯¯ï¼šæ“ä½œæ²¡æœ‰ IDã€‚è¯·å°è¯•åˆ·æ–°ã€‚' },
+        'error_process_change': { es: 'Error al procesar el cambio.', en: 'Error processing the change.', fr: 'Erreur lors du traitement du changement.', de: 'Fehler beim Verarbeiten der Änderung.', pt: 'Erro ao processar a alteração.', zh: '处理更改时出错。' },
+    'select_scenario_sync': { es: 'Por favor seleccione un escenario antes de sincronizar.', en: 'Please select a scenario before syncing.', fr: 'Veuillez sélectionner un scénario avant de synchroniser.', de: 'Bitte wählen Sie un escenario aus, bevor Sie synchronisieren.', pt: 'Por favor, selecione um escenario antes de sincronizar.', zh: '同步前请选择一个场景。' },
+    'erp_sync_success': { es: 'Sincronización con ERP completada con éxito.', en: 'ERP synchronization completed successfully.', fr: 'Synchronisation avec l\'ERP terminée avec succès.', de: 'ERP-Synchronisierung erfolgreich abgeschlossen.', pt: 'Sincronisation com o ERP concluída com sucesso.', zh: 'ERP 同步成功完成。' },
+    'erp_sync_error': { es: 'Error en la sincronización.', en: 'Error during synchronization.', fr: 'Erreur lors de la synchronisation.', de: 'Fehler bei der Synchronisierung.', pt: 'Erro durante a sincronización.', zh: '同步期间出错。' },
+
+    // Confirmations
+    'unlock_all_confirm': { es: '¿Deseas quitar el candado a TODAS las operaciones?', en: 'Do you want to unlock ALL operations?', fr: 'Voulez-vous déverrouiller TOUTES les opérations ?', de: 'Möchten Sie ALLE Operationen entsperren?', pt: 'Deseja desbloquear TODAS as operações?', zh: '您想解锁所有操作吗？' },
+    'reset_scenario_confirm': { es: '¿Estás seguro de que deseas eliminar todos los ajustes manuales y volver al cálculo original?', en: 'Are you sure you want to delete all manual adjustments and return to the original calculation?', fr: 'Êtes-vous sûr de vouloir supprimer tous los ajustes manuales y volver al cálculo original?', de: 'Sind Sie sicher, dass Sie alle manuellen Anpassungen löschen und zur ursprünglichen Berechnung zurückkehren möchten?', pt: 'Tem certeza de que desea excluir todos os ajustes manuales e retornar ao cálculo original?', zh: '您确定要删除所有手动调整并返回原始计算吗？' },
+    'delete_scenario_confirm': { es: '¿Confirmas la ELIMINACIÓN de esta simulación?', en: 'Do you confirm the DELETION of this simulation?', fr: 'Confirmez-vous la SUPPRESSION de cette simulation ?', de: 'Bestätigen Sie das LÖSCHEN dieser Simulation?', pt: 'Você confirma a EXCLUSÃO desta simulación?', zh: '您确认删除此模拟吗？' },
+    'move_op_confirm': { es: '¿Deseas MOVER esta operación y crear un NUEVO ESCENARIO? (Se liberarán el resto de los candados)', en: 'Do you want to MOVE this operation and create a NEW SCENARIO? (Other locks will be released)', fr: 'Voulez-vous DÉPLACER cette operación et crear un NOUVEAU SCÉNARIO ? (Les autres verrous seront libérés)', de: 'Möchten Sie diese Operation VERSCHIEBEN und ein NEUES SZENARIO erstellen? (Andere Sperren werden aufgehoben)', pt: 'Deseja MOVER esta operación e crear um NOVO CENÁRIO? (Os otros bloqueios serão libérés)', zh: '您想移动此操作并创建新场景吗？（其他锁定将被释放）' },
+    'erp_sync_confirm': { es: 'Se va a proceder a sincronizar el escenario [{name}] con el ERP. Se ajustarán las fechas de entrega reales en las órdenes de producción y compras según el cálculo del APS. ¿Continuar?', en: 'The scenario [{name}] will be synchronized with the ERP. Real delivery dates in production and purchase orders will be adjusted according to the APS calculation. Continue?', fr: 'Le escenario [{name}] será sincronizado com o ERP. As das fechas de entrega reales nas órdenes de producción y compra serán ajustadas de acuerdo con o cálculo del APS. Continuer ?', de: 'Das Szenario [{name}] wird mit dem ERP synchronisiert. Die tatsächlichen Liefertermine in Produktions- und Einkaufsaufträgen werden gemäß der APS-Berechnung angepasst. Fortfahren?', pt: 'O escenario [{name}] será sincronizado com o ERP. As das fechas de entrega reales nas órdenes de producción y compra serán ajustadas de acuerdo con o cálculo del APS. Continuar?', zh: '场景 [{name}] 将与 ERP 同步。生产和采购订单中的实际交付日期将根据 APS 计算进行调整。是否继续？' },
+    'delete_multiple_scenarios_confirm': { es: '¿Confirmas que deseas eliminar los {count} escenarios seleccionados?', en: 'Do you confirm that you want to delete the {count} selected scenarios?', fr: 'Confirmez-vous vouloir supprimer les {count} scénarios sélectionnés ?', de: 'Bestätigen Sie, dass Sie die {count} ausgewählten Szenarien löschen möchten?', pt: 'Você confirma que desea excluir os {count} cenarios seleccionados?', zh: '您确认要删除选定的 {count} 个场景吗？' },
+    'recalculated_new_scenario': { es: 'Planificación recalculada en nuevo escenario.', en: 'Planning recalculated in new scenario.', fr: 'Planification recalculée dans un nouveau escenario.', de: 'Planung im neuen Szenario neu berechnet.', pt: 'Planejamento recalculado em nuevo escenario.', zh: '在新场景中重新计算的计划。' },
+    'simulation': { es: 'Simulación', en: 'Simulation', fr: 'Simulation', de: 'Simulation', pt: 'Simulação', zh: '模拟' },
+    'error': { es: 'Error', en: 'Error', fr: 'Erreur', de: 'Fehler', pt: 'Erro', zh: '错误' }
+};
+
+interface LanguageContextType {
+    language: Language;
+    setLanguage: (lang: Language) => void;
+    t: (key: string, params?: Record<string, any>) => string;
+}
+
+const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
+
+export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+    const [language, setLanguage] = useState<Language>(() => {
+        return (localStorage.getItem('appLanguage') as Language) || 'es';
+    });
+
+    useEffect(() => {
+        localStorage.setItem('appLanguage', language);
+    }, [language]);
+
+    const t = (key: string, params?: Record<string, any>): string => {
+        let text = translations[key]?.[language] || key;
+        if (params) {
+            Object.keys(params).forEach(param => {
+                text = text.replace(`{${param}}`, params[param]);
+            });
+        }
+        return text;
+    };
+
+    return (
+        <LanguageContext.Provider value={{ language, setLanguage, t }}>
+            {children}
+        </LanguageContext.Provider>
+    );
+};
+
+export const useTranslation = () => {
+    const context = useContext(LanguageContext);
+    if (context === undefined) {
+        throw new Error('useTranslation must be used within a LanguageProvider');
+    }
+    return context;
+};
+
+export const languages: { code: Language; name: string; flag: string }[] = [
+    { code: 'es', name: 'Español', flag: '🇪🇸' },
+    { code: 'en', name: 'English', flag: '🇺🇸' },
+    { code: 'fr', name: 'Français', flag: '🇫🇷' },
+    { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
+    { code: 'pt', name: 'Português', flag: '🇧🇷' },
+    { code: 'zh', name: '中文', flag: '🇨🇳' },
+];
