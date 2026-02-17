@@ -79,4 +79,5 @@ export const simulation: Translations = {
     'end': { es: 'Fin', en: 'End', fr: 'Fin', de: 'Ende', pt: 'Fim', zh: '结束' },
     'history_title': { es: 'Historial', en: 'History', fr: 'Historique', de: 'Verlauf', pt: 'Histórico', zh: '历史' },
     'qty_ordered_prefix': { es: 'Cant:', en: 'Qty:', fr: 'Qté:', de: 'Menge:', pt: 'Qtd:', zh: '数量:' },
+    'working_days': { es: 'Días Laborales', en: 'Working Days', fr: 'Jours Ouvrables', de: 'Arbeitstage', pt: 'Dias Úteis', zh: '个工作日' },
 };

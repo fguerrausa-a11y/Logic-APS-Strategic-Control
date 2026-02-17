@@ -4,7 +4,31 @@ import TopHeader from '../components/TopHeader';
 import { useTranslation } from '../services/languageService';
 import { useSimulation } from '../services/SimulationContext';
 import { supabase } from '../services/supabaseClient';
-import { Activity, Clock, Zap, Anchor, Layers, Package, AlertTriangle } from 'lucide-react';
+import { Activity, Clock, Zap, Anchor, Layers, Package, AlertTriangle, Calendar } from 'lucide-react';
+
+const calculateShiftHours = (start: string, end: string): number => {
+  if (!start || !end) return 8;
+  const [h1, m1] = start.split(':').map(Number);
+  const [h2, m2] = end.split(':').map(Number);
+  return (h2 + m2 / 60) - (h1 + m1 / 60);
+};
+
+const calculateCapacityForPeriod = (start: Date, end: Date, machine: any): number => {
+  const shift = machine.shift;
+  if (!shift || !shift.days_of_week) return 8 * 60 * 30; // 30 days default
+
+  let totalMinutes = 0;
+  const curDate = new Date(start.getTime());
+  const hours = calculateShiftHours(shift.start_time, shift.end_time);
+
+  while (curDate <= end) {
+    if (shift.days_of_week?.includes(curDate.getDay())) {
+      totalMinutes += hours * 60;
+    }
+    curDate.setDate(curDate.getDate() + 1);
+  }
+  return totalMinutes;
+};
 
 const LoadAnalysisPage: React.FC = () => {
   const { t } = useTranslation();
@@ -38,12 +62,15 @@ const LoadAnalysisPage: React.FC = () => {
           const overrideCount = overrides[wc.id];
           const machineCount = overrideCount !== undefined ? Number(overrideCount) : dbMachines.length;
 
-          const avgDailyHours = dbMachines.length > 0
-            ? dbMachines.reduce((acc, m) => acc + (m.shift?.daily_capacity_hours || 8), 0) / dbMachines.length
-            : 8;
+          const start = new Date();
+          const end = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 day horizon
 
-          // Capacity = Machines * Avg Shift Hours * 60 min * 30 days
-          const totalCapacityMinutes = machineCount * avgDailyHours * 60 * 30;
+          const baseCapacity = dbMachines.length > 0
+            ? dbMachines.reduce((acc, m) => acc + calculateCapacityForPeriod(start, end, m), 0) / dbMachines.length
+            : 8 * 60 * 30;
+
+          const totalCapacityMinutes = baseCapacity * machineCount;
+
           const loadPercent = totalCapacityMinutes > 0 ? Math.round((totalRunTime / totalCapacityMinutes) * 100) : 0;
 
           return {

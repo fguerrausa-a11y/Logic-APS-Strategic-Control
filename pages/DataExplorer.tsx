@@ -680,6 +680,14 @@ const DataExplorer: React.FC = () => {
             const flattened = (result || []).map((row: any) => {
                 const newRow = { ...row };
                 if (row.item) newRow.item = row.item.name;
+
+                // --- Cálculo de Saldo ---
+                if (subTab === 'work_orders') {
+                    const ordered = Number(row.quantity_ordered || 0);
+                    const completed = Number(row.quantity_completed || 0);
+                    newRow.balance = Math.max(0, ordered - completed);
+                }
+
                 return newRow;
             });
             setData(flattened);
@@ -714,7 +722,15 @@ const DataExplorer: React.FC = () => {
 
     const getColumns = () => {
         if (data.length === 0) return [];
-        return Object.keys(data[0]).filter(c => !['id', 'scenario_id', 'created_at'].includes(c));
+        const baseCols = Object.keys(data[0]).filter(c => !['id', 'scenario_id', 'created_at'].includes(c));
+
+        // Re-ordenar columnas para Demanda si es necesario
+        if (subTab === 'work_orders') {
+            const order = ['item_id', 'quantity_ordered', 'quantity_completed', 'balance', 'due_date', 'status', 'priority'];
+            return order.filter(c => baseCols.includes(c) || c === 'balance');
+        }
+
+        return baseCols;
     };
 
     const [selectedArticle, setSelectedArticle] = useState<any | null>(null);
@@ -868,6 +884,10 @@ const DataExplorer: React.FC = () => {
                                                                                     'bg-emerald-500 shadow-emerald-500/40 border border-emerald-400/30'
                                                                                 }`} title={row[col]} />
                                                                         </div>
+                                                                    ) : col === 'balance' ? (
+                                                                        <span className="font-black text-indigo-400">
+                                                                            {row[col]}
+                                                                        </span>
                                                                     ) : String(row[col] ?? '-')}
                                                                 </td>
                                                             ))}

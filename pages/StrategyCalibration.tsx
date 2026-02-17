@@ -17,8 +17,33 @@ import {
     ArrowRight,
     ShieldCheck,
     AlertTriangle,
-    RotateCcw
+    RotateCcw,
+    Calendar
 } from 'lucide-react';
+
+const calculateShiftHours = (start: string, end: string): number => {
+    if (!start || !end) return 8;
+    const [h1, m1] = start.split(':').map(Number);
+    const [h2, m2] = end.split(':').map(Number);
+    return (h2 + m2 / 60) - (h1 + m1 / 60);
+};
+
+const calculateCapacityForPeriod = (start: Date, end: Date, machine: any): number => {
+    const shift = machine.shift;
+    if (!shift || !shift.days_of_week) return 8 * 60 * 30; // Default 30 days if no shift
+
+    let totalMinutes = 0;
+    const curDate = new Date(start.getTime());
+    const hours = calculateShiftHours(shift.start_time, shift.end_time);
+
+    while (curDate <= end) {
+        if (shift.days_of_week.includes(curDate.getDay())) {
+            totalMinutes += hours * 60;
+        }
+        curDate.setDate(curDate.setDate() + 1);
+    }
+    return totalMinutes;
+};
 
 const StrategyCalibration: React.FC = () => {
     const { t } = useTranslation();
@@ -54,7 +79,7 @@ const StrategyCalibration: React.FC = () => {
                 supabase.from('items').select('*'),
                 supabase.from('bom').select('*'),
                 supabase.from('routings').select('*'),
-                supabase.from('machines').select('*'),
+                supabase.from('machines').select('*, shift:shifts(*)'),
                 supabase.from('work_orders').select('*'),
                 supabase.from('erp_purchase_orders').select('*'),
                 supabase.from('aps_settings').select('*').limit(1).single(),
@@ -182,12 +207,26 @@ const StrategyCalibration: React.FC = () => {
                             diff={((simulation?.metrics?.avgLeadTime || 0) - (baseline?.metrics?.avgLeadTime || 0)) / (baseline?.metrics?.avgLeadTime || 1) * 100}
                         />
                         <MetricCard
-                            title="Carga de Máquinas"
-                            value="82"
+                            title="Utilización Media"
+                            value={(() => {
+                                if (!simulation || !data) return "0";
+                                const start = new Date();
+                                const end = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+                                let totalCap = 0;
+                                let totalUsage = 0;
+
+                                (data.workCenters || []).forEach((wc: any) => {
+                                    const wcMachines = data.machines.filter((m: any) => m.work_center_id === wc.id);
+                                    const wcOps = (simulation.proposedOperations || []).filter((o: any) => o.work_center_id === wc.id);
+                                    totalUsage += wcOps.reduce((acc: number, o: any) => acc + (o.run_time_minutes || 0) + (o.setup_time_minutes || 0), 0);
+                                    totalCap += wcMachines.reduce((acc: number, m: any) => acc + calculateCapacityForPeriod(start, end, m), 0);
+                                });
+                                return totalCap > 0 ? Math.round((totalUsage / totalCap) * 100) : 0;
+                            })()}
                             unit="%"
                             icon={Cpu}
                             color="emerald"
-                            diff={5}
+                            diff={0}
                         />
                     </div>
 

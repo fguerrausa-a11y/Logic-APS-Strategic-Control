@@ -97,4 +97,7 @@ export const explorer: Translations = {
     'fixed_status': { es: 'Fijo', en: 'Fixed', fr: 'Fixe', de: 'Fest', pt: 'Fixo', zh: '固定' },
     'flexible_status': { es: 'Flexible', en: 'Flexible', fr: 'Flexible', de: 'Flexibel', pt: 'Flexível', zh: '灵活' },
     'confirm_btn': { es: 'Confirmar', en: 'Confirm', fr: 'Confirmer', de: 'Bestätigen', pt: 'Confirmar', zh: '确认' },
+    'quantity_ordered': { es: 'Cant. Pedida', en: 'Qty Ordered', fr: 'Qté Commandée', de: 'Bestellte Menge', pt: 'Cant. Pedida', zh: '订购数量' },
+    'quantity_completed': { es: 'Cant. Completada', en: 'Qty Completed', fr: 'Qté Terminée', de: 'Fertiggestellte Menge', pt: 'Cant. Concluída', zh: '完成数量' },
+    'balance': { es: 'Saldo', en: 'Balance', fr: 'Solde', de: 'Restmenge', pt: 'Saldo', zh: '余额' },
 };

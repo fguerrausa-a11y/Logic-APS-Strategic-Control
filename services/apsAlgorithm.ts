@@ -18,8 +18,8 @@ export interface APSResult {
 interface Item { id: string; name: string; current_stock?: number; lead_time_days?: number; }
 interface BOM { parent_item_id: string; component_item_id: string; quantity_required: number; }
 interface Routing { item_id: string; work_center_id: string; operation_sequence: number; setup_time_minutes: number; run_time_minutes_per_unit: number; }
-interface Machine { id: string; name: string; work_center_id: string; efficiency_factor?: number; shift?: { daily_capacity_hours: number }; }
-interface WorkOrder { id: string; item_id: string; quantity_ordered: number; due_date: string; }
+interface Machine { id: string; name: string; work_center_id: string; efficiency_factor?: number; shift?: { start_time: string, end_time: string, days_of_week: number[] }; }
+interface WorkOrder { id: string; item_id: string; quantity_ordered: number; quantity_completed?: number; due_date: string; }
 
 export const apsAlgorithm = {
     /**
@@ -37,18 +37,51 @@ export const apsAlgorithm = {
         workCenters: any[],
         settings: any
     }): APSResult {
-        const { items, bom, routings, machines, workOrders, erpPurchases, existingOps, maintenancePlans, workCenters, settings } = data;
+        const { items, bom, routings, workOrders, erpPurchases, existingOps, maintenancePlans, workCenters, settings } = data;
 
-        // Simulación Stock Inicial
-        const SIM_START = new Date("2026-03-01T08:00:00Z");
+        // Apply machine overrides and build simulated resource pool
+        const machineOverrides = settings.simulation_overrides?.machine_counts || {};
+        const simulatedMachines: any[] = [];
+
+        // Identify all relevant Work Centers
+        const allWCs = new Set<string>([...routings.map(r => r.work_center_id), ...Object.keys(machineOverrides)]);
+
+        Array.from(allWCs).forEach(wcId => {
+            const realWCMachines = data.machines.filter(m => m.work_center_id === wcId);
+            const overrideCount = machineOverrides[wcId];
+            const targetCount = overrideCount !== undefined ? Number(overrideCount) : realWCMachines.length;
+
+            for (let i = 0; i < targetCount; i++) {
+                const realM = realWCMachines[i];
+                simulatedMachines.push({
+                    ...(realM || realWCMachines[0] || {}), // Use template if virtual
+                    id: realM ? realM.id : `v-mach-${wcId}-${i}`, // Este ID debe ser consistente
+                    work_center_id: wcId,
+                    name: realM ? realM.name : `Mesa Virtual ${i + 1}`,
+                    is_virtual: !realM,
+                    shift: realM?.shift || (realWCMachines[0]?.shift) || null
+                });
+            }
+        });
+
+        // Use ONLY simulatedMachines for the rest of the algorithm
+        const machines = simulatedMachines;
+
+        // Simulación Stock Inicial - Ahora es dinámica (ASAP)
+        const SIM_START = new Date();
         const SIM_START_ISO = SIM_START.toISOString();
         const SIM_START_MS = SIM_START.getTime();
 
         const simulationStock: Record<string, number> = {};
         const itemStockEvents: Record<string, any[]> = {};
         items.forEach(it => {
-            simulationStock[it.id] = Number(it.current_stock || 0);
-            itemStockEvents[it.id] = [{ date: SIM_START_ISO, type: 'INITIAL', delta: Number(it.current_stock || 0), ref: 'Stock Inicial', priority: 0 }];
+            const stock = Number(it.current_stock || (it as any).initial_stock || 0);
+            // Debug Log
+            if (it.id === 'RM-STEEL-SHEET' || it.name.includes('Chapa')) {
+                console.log(`[APS DEBUG] Stock leído para ${it.name} (${it.id}): ${stock}`);
+            }
+            simulationStock[it.id] = stock;
+            itemStockEvents[it.id] = [{ date: SIM_START_ISO, type: 'INITIAL', delta: stock, ref: 'Stock Inicial', priority: 0 }];
         });
 
         // Registrar Compras ERP
@@ -65,36 +98,16 @@ export const apsAlgorithm = {
             });
         });
 
-        // Capacidad Simulada
-        const machineOverrides = settings.simulation_overrides?.machine_counts || {};
-        const simulatedMachines: any[] = [];
-        const allWCs = items.reduce((acc: Set<string>, it) => {
-            routings.filter(r => r.item_id === it.id).forEach(r => acc.add(r.work_center_id));
-            return acc;
-        }, new Set<string>());
-
-        Array.from(new Set([...Array.from(allWCs), ...Object.keys(machineOverrides)])).forEach(wcId => {
-            const realWCMachines = machines.filter(m => m.work_center_id === wcId);
-            const count = (machineOverrides as any)[wcId] !== undefined ? Number((machineOverrides as any)[wcId]) : realWCMachines.length;
-            for (let i = 0; i < count; i++) {
-                const realM = realWCMachines[i];
-                simulatedMachines.push({
-                    id: realM ? realM.id : `v-mach-${wcId}-${i}`,
-                    work_center_id: wcId,
-                    name: realM ? realM.name : `Virtual ${i + 1} (${wcId})`,
-                    is_virtual: !realM
-                });
-            }
-        });
-
+        // Initialize internal state
         const proposedWorkOrders: any[] = [];
         const proposedPurchaseOrders: any[] = [];
         const proposedOperations: any[] = [];
         const lockedOps = (existingOps || []).filter(o => o.is_locked);
         const machineOccupancy: Record<string, { start: number, end: number, type: string }[]> = {};
+        const plannedDemand = new Map<string, number>();
 
-        simulatedMachines.forEach(m => {
-            // Initialize with Locked Operations
+        // Use the simulated machines resolved at the beginning
+        machines.forEach(m => {
             machineOccupancy[m.id] = (lockedOps || [])
                 .filter(lo => String(lo.machine_id) === String(m.id))
                 .map(lock => ({
@@ -103,7 +116,6 @@ export const apsAlgorithm = {
                     type: 'LOCKED_OP'
                 }));
 
-            // Include Maintenance Plans as hard blocks
             if (settings.include_maintenance) {
                 const maint = (maintenancePlans || [])
                     .filter(p => String(p.machine_id) === String(m.id))
@@ -114,24 +126,98 @@ export const apsAlgorithm = {
                     }));
                 machineOccupancy[m.id].push(...maint);
             }
-
             machineOccupancy[m.id].sort((a, b) => a.start - b.start);
         });
 
         const toISO = (ts: number | string | Date) => new Date(ts).toISOString();
 
+        const getShiftInfo = (mId: string) => {
+            const m = machines.find(mach => mach.id === mId);
+            return m?.shift;
+        };
+
+        const isShiftActive = (ts: number, shift: any): boolean => {
+            if (!shift) return true;
+            const d = new Date(ts);
+            if (!shift.days_of_week?.includes(d.getDay())) return false;
+            const [sh, sm] = (shift.start_time || "00:00").split(':').map(Number);
+            const [eh, em] = (shift.end_time || "23:59").split(':').map(Number);
+            const currentMins = d.getHours() * 60 + d.getMinutes();
+            return currentMins >= (sh * 60 + sm) && currentMins < (eh * 60 + em);
+        };
+
+        const addWorkingTime = (start: number, durationMs: number, shift: any): number => {
+            if (!shift) return start + durationMs;
+            let current = start;
+            let remaining = durationMs;
+            while (remaining > 0) {
+                const d = new Date(current);
+                if (!shift.days_of_week?.includes(d.getDay())) {
+                    d.setHours(24, 0, 0, 0);
+                    current = d.getTime();
+                    continue;
+                }
+                const [sh, sm] = (shift.start_time || "00:00").split(':').map(Number);
+                const [eh, em] = (shift.end_time || "23:59").split(':').map(Number);
+                const startOfDay = new Date(d).setHours(sh, sm, 0, 0);
+                const endOfDay = new Date(d).setHours(eh, em, 0, 0);
+                if (current < startOfDay) current = startOfDay;
+                if (current >= endOfDay) {
+                    d.setHours(24, 0, 0, 0);
+                    current = d.getTime();
+                    continue;
+                }
+                const availableToday = endOfDay - current;
+                const useToday = Math.min(availableToday, remaining);
+                current += useToday;
+                remaining -= useToday;
+            }
+            return current;
+        };
+
         const findEarliestSlot = (machineId: string, minStart: number, durationMs: number): number => {
-            let potentialStart = Math.max(Date.now(), minStart);
+            const shift = getShiftInfo(machineId);
+            let potentialStart = Math.max(SIM_START_MS, minStart);
             const intervals = machineOccupancy[machineId] || [];
-            for (const interval of intervals) {
-                const potentialEnd = potentialStart + durationMs;
-                if (potentialEnd <= interval.start) return potentialStart;
-                if (potentialStart < interval.end) potentialStart = interval.end + 60000;
+
+            let found = false;
+            while (!found) {
+                // Ensure potentialStart is within a shift
+                if (shift) {
+                    const d = new Date(potentialStart);
+                    const [sh, sm] = (shift.start_time || "00:00").split(':').map(Number);
+                    const startOfDay = new Date(d).setHours(sh, sm, 0, 0);
+                    const [eh, em] = (shift.end_time || "23:59").split(':').map(Number);
+                    const endOfDay = new Date(d).setHours(eh, em, 0, 0);
+
+                    if (!shift.days_of_week?.includes(d.getDay()) || potentialStart >= endOfDay) {
+                        d.setHours(24, 0, 0, 0);
+                        potentialStart = d.getTime();
+                        continue;
+                    }
+                    if (potentialStart < startOfDay) potentialStart = startOfDay;
+                }
+
+                const potentialEnd = addWorkingTime(potentialStart, durationMs, shift);
+                const conflict = intervals.find(inv =>
+                    (potentialStart >= inv.start && potentialStart < inv.end) ||
+                    (potentialEnd > inv.start && potentialEnd <= inv.end) ||
+                    (potentialStart <= inv.start && potentialEnd >= inv.end)
+                );
+
+                if (conflict) {
+                    potentialStart = conflict.end + 60000; // Skip conflict + 1 min buffer
+                } else {
+                    found = true;
+                }
             }
             return potentialStart;
         };
 
         const fulfillDemand = (itemId: string, qtyNeeded: number, requestedDate: number, ref: string, isRoot = false): { readyDate: number, reason: string } => {
+            if (ref && plannedDemand.has(ref + itemId)) {
+                return { readyDate: plannedDemand.get(ref + itemId)!, reason: 'none' };
+            }
             const item = items.find(i => i.id === itemId);
             let currentReason = 'none';
             const projectedAtDate = (itemStockEvents[itemId] || [])
@@ -161,73 +247,100 @@ export const apsAlgorithm = {
                     }
                 });
 
-                let curStart = maxCompReady;
-                let prevOpStart = maxCompReady;
+                let nextStepMinStart = maxCompReady;
+                let prevOpStart = maxCompReady; // Track for overlap calculation for the *next* routing step
                 let prevOpSetup = 0;
                 let prevOpRunPerUnit = 0;
 
                 itemRoutings.forEach((route, rIdx) => {
                     const mtrs = simulatedMachines.filter(m => m.work_center_id === route.work_center_id);
                     const isLocked = lockedOps.find(lo => String(lo.work_order_id || '').replace('WO-', '') === String(ref.replace('WO-', '')) && String(lo.operation_sequence) === String(route.operation_sequence));
-
                     const wc = workCenters.find(w => w.id === route.work_center_id);
-                    // Prioritizamos eficiencia de máquina, si no usamos centro de trabajo
                     const wcEfficiency = Number(wc?.efficiency_factor || 1.0);
 
-                    let actS, dur, finalMachineId;
+                    // Strategy parameters - REINFORCED
+                    const isSplitActive = Boolean(settings.simulation_overrides?.split_ops_enabled && !isLocked);
+                    const userSplitLimit = Number(settings.simulation_overrides?.max_split_machines || 1);
+
+                    // We split by MIN(User Limit, Available Capacity)
+                    const availableMachinesCount = mtrs.length;
+                    const numSplits = isSplitActive ? Math.max(1, Math.min(userSplitLimit, availableMachinesCount)) : 1;
+
                     const setup = Number(route.setup_time_minutes || 0);
                     const runPerUnit = Number(route.run_time_minutes_per_unit || 0);
 
-                    // Adjust duration based on work center efficiency for initial slot finding
-                    const opDur = ((setup + (runPerUnit * remaining)) / wcEfficiency) * 60 * 1000;
+                    let operationEndDates: number[] = [];
+                    const subLotQty = Math.ceil(remaining / numSplits);
+                    let leftToDistribute = remaining;
 
-                    if (isLocked) {
-                        actS = new Date(isLocked.start_date).getTime();
-                        dur = new Date(isLocked.end_date).getTime() - actS;
-                        finalMachineId = isLocked.machine_id;
-                    } else {
-                        // OVERLAP LOGIC: If enabled and not the first operation
-                        let minStart = curStart; // Default: Start after previous ends
-                        if (settings.overlap_enabled && rIdx > 0) {
-                            // Can start after setup + 1 unit of previous op is COMPLETED
-                            minStart = prevOpStart + (prevOpSetup + prevOpRunPerUnit) * 60 * 1000;
+                    for (let i = 0; i < numSplits; i++) {
+                        const qtyForThisMachine = Math.min(subLotQty, leftToDistribute);
+                        if (qtyForThisMachine <= 0) break;
+
+                        // UNIQUE MACHINE ASSIGNMENT: Prefer machines not already used for this split
+                        const chosenM = mtrs[i % mtrs.length].id;
+
+                        // OVERLAP LOGIC for this sub-lot
+                        let minStart = nextStepMinStart;
+                        const isOverlapActive = settings.simulation_overrides?.overlap_enabled || settings.overlap_enabled;
+
+                        if (isOverlapActive && rIdx > 0) {
+                            const prevWC = workCenters.find(w => w.id === itemRoutings[rIdx - 1].work_center_id);
+                            const overlapPct = Number(prevWC?.overlap_percentage || settings.default_overlap_pct || 0);
+                            // Units to finish: (Total Qty) * (1 - overlap%)
+                            // We must finish at least 1 unit + setup
+                            const unitsToFinish = Math.max(1, remaining * (1 - (overlapPct / 100)));
+                            minStart = prevOpStart + (prevOpSetup + (prevOpRunPerUnit * unitsToFinish)) * 60 * 1000;
                         }
 
-                        // TOC Optimization: Add a safety buffer for bottlenecks
+                        // TOC Optimization
                         if (settings.scheduling_mode === 'TOC Optimized' && settings.bottleneck_management === 'Drum-Buffer-Rope') {
                             const isBottleneck = mtrs.length === 1; // Simplified bottleneck detection
                             if (isBottleneck) minStart += (settings.default_buffer_days || 1) * 24 * 60 * 60 * 1000 / 4; // 25% of buffer
                         }
 
-                        let earliestPossible = Infinity;
-                        let chosenM = mtrs[0]?.id;
-                        mtrs.forEach(m => {
-                            const best = findEarliestSlot(m.id, minStart, opDur);
-                            if (best < earliestPossible) { earliestPossible = best; chosenM = m.id; }
-                        });
-
-                        // Re-calculate duration based on the selected machine efficiency
+                        // Adjust duration based on work center efficiency for initial slot finding
+                        const opDurForSubLot = ((setup + (runPerUnit * qtyForThisMachine)) / wcEfficiency) * 60 * 1000;
+                        const actualStart = findEarliestSlot(chosenM, minStart, opDurForSubLot);
                         const machineData = machines.find(m => m.id === chosenM);
                         const finalEfficiency = Number(machineData?.efficiency_factor || wcEfficiency);
-                        dur = ((setup + (runPerUnit * remaining)) / finalEfficiency) * 60 * 1000;
+                        const actE = addWorkingTime(actualStart, ((setup + (runPerUnit * qtyForThisMachine)) / finalEfficiency) * 60 * 1000, machineData?.shift);
 
-                        actS = earliestPossible; finalMachineId = chosenM;
-                    }
-                    const actE = actS + dur;
-                    if (finalMachineId) {
-                        proposedOperations.push({ work_order_id: ref.replace('WO-', ''), operation_sequence: route.operation_sequence, item_id: itemId, machine_id: finalMachineId, work_center_id: route.work_center_id, start_date: toISO(actS), end_date: toISO(actE), setup_time_minutes: setup, run_time_minutes: runPerUnit * remaining, quantity: remaining, is_locked: !!isLocked });
-                        if (!isLocked) { machineOccupancy[finalMachineId].push({ start: actS, end: actE, type: 'PROPOSED_OP' }); machineOccupancy[finalMachineId].sort((a, b) => a.start - b.start); }
+                        proposedOperations.push({
+                            work_order_id: ref.replace('WO-', ''),
+                            operation_sequence: route.operation_sequence,
+                            item_id: itemId,
+                            machine_id: chosenM,
+                            work_center_id: route.work_center_id,
+                            start_date: toISO(actualStart),
+                            end_date: toISO(actE),
+                            setup_time_minutes: setup,
+                            run_time_minutes: runPerUnit * qtyForThisMachine,
+                            quantity: qtyForThisMachine,
+                            is_locked: !!isLocked
+                        });
 
-                        // Update tracking for next op overlap
-                        prevOpStart = actS;
-                        prevOpSetup = setup;
-                        prevOpRunPerUnit = runPerUnit;
-                        curStart = actE;
+                        if (!isLocked) {
+                            machineOccupancy[chosenM].push({ start: actualStart, end: actE, type: 'PROPOSED_OP' });
+                            machineOccupancy[chosenM].sort((a, b) => a.start - b.start);
+                        }
+
+                        operationEndDates.push(actE);
+                        leftToDistribute -= qtyForThisMachine;
+
+                        // Tracking for next step overlap (approximate with first machine's operation in a split)
+                        if (i === 0) {
+                            prevOpStart = actualStart;
+                            prevOpSetup = setup;
+                            prevOpRunPerUnit = runPerUnit;
+                        }
                     }
+
+                    nextStepMinStart = Math.max(...operationEndDates);
                 });
 
-                const finalDate = curStart;
-                if (maxCompReady > Date.now()) currentReason = componentReason === 'none' ? 'supply' : componentReason;
+                const finalDate = nextStepMinStart;
+                if (maxCompReady > SIM_START_MS) currentReason = componentReason === 'none' ? 'supply' : componentReason;
                 itemStockEvents[itemId].push({ date: toISO(finalDate), type: 'PRODUCTION', delta: remaining, ref: isRoot ? `Termino ${ref}` : `Reponer Stock`, priority: 1 });
                 itemStockEvents[itemId].push({ date: toISO(finalDate), type: 'CONSUMPTION', delta: -remaining, ref: `${ref}`, priority: 2 });
 
@@ -237,6 +350,7 @@ export const apsAlgorithm = {
                     sev = 'red';
                 }
                 proposedWorkOrders.push({ item_id: itemId, work_order_id: isRoot ? ref.replace('WO-', '') : null, quantity: remaining, start_date: toISO(maxCompReady), end_date: toISO(finalDate), due_date: isRoot ? toISO(requestedDate) : null, delay_days: delay, severity: sev, status: 'proposed', action_type: isRoot ? 'new' : 'reponer' });
+                if (ref) plannedDemand.set(ref + itemId, finalDate);
                 return { readyDate: finalDate, reason: currentReason };
             } else {
                 const erpPO = erpPurchases.find(po => po.item_id === itemId && !po.is_fixed);
@@ -249,7 +363,7 @@ export const apsAlgorithm = {
                     leadTime = Math.ceil(leadTime * 1.5); // 50% increase due to no-stock policy
                 }
 
-                const possibleTs = Date.now() + (leadTime * 24 * 60 * 60 * 1000);
+                const possibleTs = SIM_START_MS + (leadTime * 24 * 60 * 60 * 1000);
                 proposedPurchaseOrders.push({ item_id: itemId, quantity: remaining, delivery_date: toISO(possibleTs), erp_ref_id: erpPO?.id, change_type: erpPO ? 'reprogram' : 'new', status: 'suggested' });
                 itemStockEvents[itemId].push({ date: toISO(possibleTs), type: 'PURCHASE', delta: remaining, ref: `Abastecimiento (${settings.reprovision_policy || 'MRP'})`, priority: 1 });
                 itemStockEvents[itemId].push({ date: toISO(possibleTs), type: 'CONSUMPTION', delta: -remaining, ref: `${ref} (Comprado)`, priority: 2 });
@@ -258,7 +372,16 @@ export const apsAlgorithm = {
         };
 
         workOrders.sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())
-            .forEach(o => fulfillDemand(o.item_id, Number(o.quantity_ordered || 1), new Date(o.due_date).getTime(), `WO-${o.id}`, true));
+            .forEach(o => {
+                const ordered = Number(o.quantity_ordered || 0);
+                const completed = Number(o.quantity_completed || 0);
+                const balance = Math.max(0, ordered - completed);
+
+                // Solo planificar si hay un saldo pendiente
+                if (balance > 0) {
+                    fulfillDemand(o.item_id, balance, new Date(o.due_date).getTime(), `WO-${o.id}`, true);
+                }
+            });
 
         const finalSF: Record<string, any[]> = {};
         Object.keys(itemStockEvents).forEach(id => {

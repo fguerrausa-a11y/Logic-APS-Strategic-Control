@@ -34,14 +34,14 @@ import { useSimulation } from '../services/SimulationContext';
 import TopHeader from '../components/TopHeader';
 
 const WO_COLORS = [
-  { bg: 'bg-indigo-600/40', border: 'border-indigo-500/60', hover: 'hover:bg-indigo-600/60', text: 'text-white' },
-  { bg: 'bg-emerald-600/40', border: 'border-emerald-500/60', hover: 'hover:bg-emerald-600/60', text: 'text-white' },
-  { bg: 'bg-amber-600/40', border: 'border-amber-500/60', hover: 'hover:bg-amber-600/60', text: 'text-white' },
-  { bg: 'bg-rose-600/40', border: 'border-rose-500/60', hover: 'hover:bg-rose-600/60', text: 'text-white' },
-  { bg: 'bg-cyan-600/40', border: 'border-cyan-500/60', hover: 'hover:bg-cyan-600/60', text: 'text-white' },
+  { bg: 'bg-indigo-600', border: 'border-indigo-400', hover: 'hover:bg-indigo-500', text: 'text-white' },
+  { bg: 'bg-emerald-600', border: 'border-emerald-400', hover: 'hover:bg-emerald-500', text: 'text-white' },
+  { bg: 'bg-amber-600', border: 'border-amber-400', hover: 'hover:bg-amber-500', text: 'text-white' },
+  { bg: 'bg-rose-600', border: 'border-rose-400', hover: 'hover:bg-rose-500', text: 'text-white' },
+  { bg: 'bg-cyan-600', border: 'border-cyan-400', hover: 'hover:bg-cyan-500', text: 'text-white' },
 ];
 
-const OperationDetailPanel: React.FC<{ operation: any; onClose: () => void }> = ({ operation, onClose }) => {
+const OperationDetailPanel: React.FC<{ operation: any; allOperations: any[]; onClose: () => void }> = ({ operation, allOperations, onClose }) => {
   const { t, language } = useTranslation();
   if (!operation) return null;
   return (
@@ -69,10 +69,55 @@ const OperationDetailPanel: React.FC<{ operation: any; onClose: () => void }> = 
             <p className="text-xs font-bold mt-1">{new Date(operation.start_date).toLocaleString(language === 'es' ? 'es-AR' : 'en-US')}</p>
           </div>
           <div className="p-4 bg-[var(--bg-main)] rounded-xl border border-[var(--border-color)]">
-            <span className="text-[8px] font-black uppercase text-[var(--text-muted)]">{t('end')}</span>
-            <p className="text-xs font-bold mt-1">{new Date(operation.end_date).toLocaleString(language === 'es' ? 'es-AR' : 'en-US')}</p>
+            <span className="text-[8px] font-black uppercase text-[var(--text-muted)]">{t('quantity')}</span>
+            <p className="text-sm font-black text-indigo-500 mt-1">{operation.quantity} <span className="text-[10px] opacity-60">UNIDADES</span></p>
           </div>
         </div>
+
+        {/* Parallel Ops / Splitting Info */}
+        {(() => {
+          const siblings = allOperations.filter(o =>
+            o.work_order_id === operation.work_order_id &&
+            o.operation_sequence === operation.operation_sequence &&
+            o.id !== operation.id
+          );
+          if (siblings.length === 0) return null;
+
+          const totalQty = (Number(operation.quantity) + siblings.reduce((acc, s) => acc + Number(s.quantity), 0));
+          const myPct = Math.round((operation.quantity / totalQty) * 100);
+
+          return (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <RefreshCw size={14} className="text-blue-500" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-blue-500">{t('lot_splitting_active') || 'Distribución de Lote (Splitting)'}</span>
+              </div>
+              <div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-2xl space-y-3">
+                <div className="flex justify-between items-center text-[10px] font-bold">
+                  <span>{t('total_lot') || 'Lote Total'}: {totalQty} U</span>
+                  <span className="text-blue-500">{myPct}% {t('of_total') || 'del total'}</span>
+                </div>
+                <div className="h-1.5 w-full bg-blue-500/10 rounded-full overflow-hidden flex">
+                  <div style={{ width: `${myPct}%` }} className="h-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
+                  {siblings.map((s, idx) => (
+                    <div key={idx} style={{ width: `${Math.round((s.quantity / totalQty) * 100)}%` }} className="h-full bg-blue-400/30 border-l border-blue-500/20"></div>
+                  ))}
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[9px] font-black text-[var(--text-muted)] uppercase tracking-wider">{t('other_machines') || 'OTROS EQUIPOS TRABAJANDO'}</p>
+                  <div className="grid gap-1.5 pt-1">
+                    {siblings.map((s, idx) => (
+                      <div key={idx} className="flex justify-between items-center text-[10px] opacity-70">
+                        <span className="flex items-center gap-1"><ArrowRight size={8} /> {s.machine_id}</span>
+                        <span className="font-bold">{s.quantity} U</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
@@ -141,7 +186,7 @@ const SchedulePage: React.FC = () => {
   const [pixelsPerUnit, setPixelsPerUnit] = useState(120);
   const [selectedOperation, setSelectedOperation] = useState<any | null>(null);
   const [selectedMaintenance, setSelectedMaintenance] = useState<any | null>(null);
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('theme') as 'light' | 'dark') || 'dark');
+  // const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('theme') as 'light' | 'dark') || 'dark');
   const [stockFlowData, setStockFlowData] = useState<Record<string, any>>({});
   const [showStockFlow, setShowStockFlow] = useState(false);
   const [selectedStockItem, setSelectedStockItem] = useState<string | null>(null);
@@ -166,7 +211,7 @@ const SchedulePage: React.FC = () => {
   const ROW_HEIGHT = 40;
   const SIDEBAR_WIDTH = 180;
 
-  useEffect(() => { document.documentElement.setAttribute('data-theme', theme); localStorage.setItem('theme', theme); }, [theme]);
+  // useEffect(() => { document.documentElement.setAttribute('data-theme', theme); localStorage.setItem('theme', theme); }, [theme]);
 
   useEffect(() => {
     if (selectedScenarioId) {
@@ -180,15 +225,25 @@ const SchedulePage: React.FC = () => {
     try {
       const { data: itemsRaw } = await supabase.from('items').select('*');
       const itemsData = itemsRaw || [];
-      const res = await apsAlgorithm.runSimulation(id);
+      // DO NOT call runSimulation here. It should only be called by the user action in Simulation.tsx.
+      // We only fetch existing results for this scenario.
+      const { data: dbOps } = await supabase.from('proposed_operations').select('*').eq('scenario_id', id);
+      const { data: dbWOs } = await supabase.from('proposed_work_orders').select('*').eq('scenario_id', id);
+      const { data: dbPOs } = await supabase.from('proposed_purchase_orders').select('*').eq('scenario_id', id);
 
+      const simulationResults = {
+        proposedOperations: dbOps || [],
+        proposedWorkOrders: dbWOs || [],
+        proposedPurchaseOrders: dbPOs || [],
+        stockFlow: {} // Stock flow might need a separate fetch if we really need it here
+      };
+
+      // Fetch Stock Flow if needed
+      const { data: flowRaw } = await supabase.from('simulation_stock_flow').select('*').eq('scenario_id', id);
       const flowWithNames: any = {};
-      Object.keys(res.stockFlow || {}).forEach(itemId => {
-        const item = itemsData.find(i => i.id === itemId);
-        flowWithNames[itemId] = {
-          name: item?.name || itemId,
-          events: res.stockFlow[itemId]
-        };
+      (flowRaw || []).forEach(f => {
+        if (!flowWithNames[f.item_id]) flowWithNames[f.item_id] = { name: itemsData.find(i => i.id === f.item_id)?.name || f.item_id, events: [] };
+        flowWithNames[f.item_id].events.push(f);
       });
       setStockFlowData(flowWithNames);
 
@@ -196,13 +251,11 @@ const SchedulePage: React.FC = () => {
       const { data: maintRaw } = await supabase.from('maintenance_plans').select('*');
       setMaintenancePlans(maintRaw || []);
 
-      // Use operations from result primarily, fallback to DB if needed
-      const { data: dbOps } = await supabase.from('proposed_operations').select('*').eq('scenario_id', id);
-      const opsToUse = (dbOps && dbOps.length > 0) ? dbOps : res.proposedOperations;
+      const opsToUse = (dbOps && dbOps.length > 0) ? dbOps : [];
 
       const finalOpsMapped = (opsToUse || []).map((dbOp: any) => {
         const item = itemsData.find(i => i.id === dbOp.item_id);
-        const suggestion = res.proposedWorkOrders?.find(p =>
+        const suggestion = simulationResults.proposedWorkOrders?.find((p: any) =>
           p.item_id === dbOp.item_id &&
           (p.work_order_id === dbOp.work_order_id || p.quantity === dbOp.quantity)
         );
@@ -214,27 +267,31 @@ const SchedulePage: React.FC = () => {
       });
       setOperations(finalOpsMapped);
 
-      // --- EXHAUSTIVE MACHINE RESOLUTION ---
       const { data: scenData } = await supabase.from('scenarios').select('*').eq('id', id).single();
       const overrides = scenData?.simulation_overrides?.machine_counts || {};
 
       const { data: fullMachinesData } = await supabase.from('machines').select('*, work_center:work_centers(name)');
       const allDBMachines = fullMachinesData || [];
 
-      const relevantWCs = Array.from(new Set([...allDBMachines.map(m => m.work_center_id), ...Object.keys(overrides)]));
-
+      // Logic to resolve ALL machines in this scenario (Real + Virtual)
       const finalMachineList: any[] = [];
-      relevantWCs.forEach(wcId => {
-        const dbWCMachines = allDBMachines.filter(m => m.work_center_id === wcId);
-        const overrideCount = overrides[wcId];
-        const count = overrideCount !== undefined ? Number(overrideCount) : dbWCMachines.length;
 
-        for (let i = 0; i < count; i++) {
+      // Get all Work Centers that appear in the DB OR in overrides
+      const dbWCIds = Array.from(new Set(allDBMachines.map(m => m.work_center_id)));
+      const overrideWCIds = Object.keys(overrides);
+      const allWCs = Array.from(new Set([...dbWCIds, ...overrideWCIds]));
+
+      allWCs.forEach(wcId => {
+        const dbWCMachines = allDBMachines.filter(m => m.work_center_id === wcId);
+        const targetCount = overrides[wcId] !== undefined ? Number(overrides[wcId]) : dbWCMachines.length;
+
+        for (let i = 0; i < targetCount; i++) {
           const realM = dbWCMachines[i];
           finalMachineList.push({
             id: realM ? realM.id : `v-mach-${wcId}-${i}`,
-            name: realM ? realM.name : `${t('virtual_table_prefix')} ${i + 1} (${wcId})`,
-            work_center: realM?.work_center || { name: wcId }
+            name: realM ? realM.name : `Mesa Virtual ${i + 1}`,
+            work_center: realM?.work_center || { name: allDBMachines.find(m => m.work_center_id === wcId)?.work_center?.name || wcId, id: wcId },
+            work_center_id: wcId
           });
         }
       });
@@ -400,9 +457,8 @@ const SchedulePage: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="p-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] hover:border-indigo-500/50 transition-all text-[var(--text-muted)]">
-              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
+            {/* Theme toggle removed - handled by Sidebar */}
+
             <div className="flex bg-[var(--bg-input)] rounded-xl p-1 border border-[var(--border-color)] gap-1">
               <button title={t('schedule')} onClick={() => setShowStockFlow(false)} className={`p-1.5 rounded-lg transition-all ${!showStockFlow ? 'bg-indigo-600 text-white shadow-lg' : 'text-[var(--text-muted)] hover:text-indigo-400'}`}><GanttChart size={16} /></button>
               <button title={showStockFlow ? t('schedule') : t('inventory_buffers')} onClick={() => setShowStockFlow(true)} className={`p-1.5 rounded-lg transition-all ${showStockFlow ? 'bg-indigo-600 text-white shadow-lg' : 'text-[var(--text-muted)] hover:text-indigo-400'}`}><RefreshCw size={16} /></button>
@@ -777,7 +833,12 @@ const SchedulePage: React.FC = () => {
                                 </p>
 
                                 <div className="flex justify-between items-center mt-auto border-t border-white/10 pt-0.5">
-                                  <span className={`text-[6px] font-black uppercase tracking-tighter ${colors.text}`}>S{op.operation_sequence}</span>
+                                  <div className="flex items-center gap-1">
+                                    <span className={`text-[6px] font-black uppercase tracking-tighter ${colors.text}`}>S{op.operation_sequence}</span>
+                                    {operations.some(o => o.work_order_id === op.work_order_id && o.operation_sequence === op.operation_sequence && o.id !== op.id) && (
+                                      <RefreshCw size={6} className={colors.text} />
+                                    )}
+                                  </div>
                                   <span className={`text-[6px] font-black ${colors.text} opacity-70`}>{op.quantity}U</span>
                                 </div>
                               </div>
@@ -806,7 +867,7 @@ const SchedulePage: React.FC = () => {
           )}
         </div>
 
-        <OperationDetailPanel operation={selectedOperation} onClose={() => setSelectedOperation(null)} />
+        <OperationDetailPanel operation={selectedOperation} allOperations={operations} onClose={() => setSelectedOperation(null)} />
         <MaintenanceDetailPanel
           maintenance={selectedMaintenance}
           machines={machines}

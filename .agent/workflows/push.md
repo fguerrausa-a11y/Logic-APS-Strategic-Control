@@ -1,16 +1,18 @@
 ---
-description: Backup del proyecto en GitHub usando el repositorio vinculado mediante MCP.
+description: Backup del proyecto en GitHub usando Git local para máxima fiabilidad.
 ---
 
-Este workflow asegura que el estado actual del proyecto se guarde en la ubicación correcta de GitHub.
+Este workflow asegura que el estado actual del proyecto se resguarde en el repositorio oficial de control estratégico.
 
-1. **Repositorio Destino:** `fguerrausa-a11y/Logic-APS`
+1. **Repositorio Destino:** `fguerrausa-a11y/Logic-APS-Strategic-Control`
 2. **Rama:** `main`
-3. **Herramienta:** `mcp_github-mcp-server_push_files`
+3. **Método Sugerido:**
+   ```powershell
+   & "C:\Program Files\Git\bin\git.exe" add .
+   & "C:\Program Files\Git\bin\git.exe" commit -m "Backup descriptivo"
+   & "C:\Program Files\Git\bin\git.exe" push origin main
+   ```
 
-**Archivos Críticos a Mantener Sincronizados:**
-- `pages/` (Todas las vistas)
-- `services/` (Lógica del APS y algoritmos)
-- `components/` (UI Maestros)
-- `scripts/` (Utilidades y sembrados)
-- `package.json`, `index.tsx`, `App.tsx`, `index.css`
+**Nota de Seguridad:**
+- El archivo `.env.local` (llaves API) NO se sube por seguridad. Mantén tu copia externa actualizada.
+

@@ -24,9 +24,48 @@ import {
   Settings,
   ShieldCheck,
   Sun,
-  Moon
+  Zap,
+  Calendar
 } from 'lucide-react';
 import { useTranslation } from '../services/languageService';
+
+const calculateWorkingDays = (start: Date, end: Date): number => {
+  let count = 0;
+  const curDate = new Date(start.getTime());
+  while (curDate <= end) {
+    const dayOfWeek = curDate.getDay();
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Not Sunday or Saturday
+      count++;
+    }
+    curDate.setDate(curDate.getDate() + 1);
+  }
+  return count;
+};
+
+const calculateShiftHours = (start: string, end: string): number => {
+  if (!start || !end) return 8;
+  const [h1, m1] = start.split(':').map(Number);
+  const [h2, m2] = end.split(':').map(Number);
+  return (h2 + m2 / 60) - (h1 + m1 / 60);
+};
+
+const calculateCapacityForPeriod = (start: Date, end: Date, machine: any): number => {
+  const shift = machine.shift;
+  if (!shift || !shift.days_of_week) return 8 * 60 * calculateWorkingDays(start, end);
+
+  let totalMinutes = 0;
+  const curDate = new Date(start.getTime());
+  const hours = calculateShiftHours(shift.start_time, shift.end_time);
+  const activeDays = Array.isArray(shift.days_of_week) ? shift.days_of_week.map(Number) : [];
+
+  while (curDate <= end) {
+    if (activeDays.includes(curDate.getDay())) {
+      totalMinutes += hours * 60;
+    }
+    curDate.setDate(curDate.getDate() + 1);
+  }
+  return totalMinutes;
+};
 
 interface OrderSelectionModalProps {
   isOpen: boolean;
@@ -127,9 +166,12 @@ const SimulationPage: React.FC = () => {
 
   const [virtualMachines, setVirtualMachines] = useState<Record<string, number>>({});
   const [includeMaintenance, setIncludeMaintenance] = useState(true);
+  const [overlapEnabled, setOverlapEnabled] = useState(false);
+  const [splitOpsEnabled, setSplitOpsEnabled] = useState(false);
+  const [maxSplitMachines, setMaxSplitMachines] = useState(2);
   const [filters, setFilters] = useState({
-    fromDate: '2026-03-01',
-    toDate: '2026-03-31',
+    fromDate: new Date().toISOString().split('T')[0],
+    toDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     orderIds: ''
   });
 
@@ -138,9 +180,20 @@ const SimulationPage: React.FC = () => {
     localStorage.setItem('theme', theme);
   }, [theme]);
 
+  const [defaultMachineCounts, setDefaultMachineCounts] = useState<Record<string, number>>({});
+
   useEffect(() => {
     loadBaseData();
   }, []);
+
+  // Ensure defaults are applied if no scenario is active, or if scenario overrides are missing
+  useEffect(() => {
+    if (Object.keys(defaultMachineCounts).length > 0) {
+      if (!selectedScenarioId) {
+        setVirtualMachines(defaultMachineCounts);
+      }
+    }
+  }, [defaultMachineCounts, selectedScenarioId]);
 
   useEffect(() => {
     if (selectedScenarioId && scenarios.length > 0) {
@@ -161,7 +214,11 @@ const SimulationPage: React.FC = () => {
       wcs?.forEach(wc => {
         realCounts[wc.id] = machs?.filter(m => m.work_center_id === wc.id).length || 0;
       });
-      setVirtualMachines(realCounts);
+      setDefaultMachineCounts(realCounts);
+      // Only set virtual if not already set or no scenario active (handled by effect)
+      if (!selectedScenarioId) {
+        setVirtualMachines(realCounts);
+      }
     } catch (e) {
       console.error(e);
     }
@@ -175,8 +232,17 @@ const SimulationPage: React.FC = () => {
     setProposedOperations([]);
 
     try {
-      setVirtualMachines(scenario.simulation_overrides?.machine_counts || {});
+      // Use overrides if present, otherwise fallback to defaults (real capacity)
+      const overrides = scenario.simulation_overrides?.machine_counts;
+      if (overrides && Object.keys(overrides).length > 0) {
+        setVirtualMachines(overrides);
+      } else {
+        setVirtualMachines(defaultMachineCounts);
+      }
       setIncludeMaintenance(scenario.include_maintenance ?? true);
+      setOverlapEnabled(scenario.simulation_overrides?.overlap_enabled ?? false);
+      setSplitOpsEnabled(scenario.simulation_overrides?.split_ops_enabled ?? false);
+      setMaxSplitMachines(scenario.simulation_overrides?.max_split_machines ?? 2);
 
       const savedFilters = scenario.simulation_overrides?.filters || filters;
       if (Array.isArray(savedFilters.orderIds)) {
@@ -205,7 +271,7 @@ const SimulationPage: React.FC = () => {
       const { data: ops } = await supabase.from('proposed_operations').select('*').eq('scenario_id', scenario.id);
       setProposedOperations(ops || []);
 
-      const { data: scenarioMachines } = await supabase.from('machines').select('id, work_center_id, shift:shifts(daily_capacity_hours)');
+      const { data: scenarioMachines } = await supabase.from('machines').select('id, work_center_id, shift:shifts(*)');
       (scenario as any).machines_data = scenarioMachines;
 
       const redWCs = new Set<string>();
@@ -222,6 +288,7 @@ const SimulationPage: React.FC = () => {
       setLoadingProposed(false);
     }
   };
+
 
   const [isSyncing, setIsSyncing] = useState(false);
   const handleSyncERP = async () => {
@@ -251,12 +318,19 @@ const SimulationPage: React.FC = () => {
     setSimulationProgress(0);
     try {
       const name = `${t('simulation_name_prefix')} ${new Date().toLocaleString(language === 'es' ? 'es-AR' : 'en-US')}`;
+      const { data: { user } } = await supabase.auth.getUser();
+      // Fallback ID for development stability (matches existing data)
+      const userId = user?.id || "44f60375-a5e9-4c37-a52e-92db947dafd9";
+
       const { data: newScenario, error: scnErr } = await supabase.from('scenarios').insert({
         name,
-        user_id: (await supabase.auth.getUser()).data.user?.id,
+        user_id: userId,
         include_maintenance: includeMaintenance,
         simulation_overrides: {
           machine_counts: virtualMachines,
+          overlap_enabled: overlapEnabled,
+          split_ops_enabled: splitOpsEnabled,
+          max_split_machines: maxSplitMachines,
           filters: { ...filters, orderIds: typeof filters.orderIds === 'string' ? (filters.orderIds ? filters.orderIds.split(',').map(s => s.trim()) : []) : filters.orderIds }
         }
       }).select().single();
@@ -307,6 +381,35 @@ const SimulationPage: React.FC = () => {
                     <span className="text-xs font-black uppercase tracking-widest">{t('consider_maintenance')}</span>
                   </div>
                   <div className={`w-3 h-3 rounded-full ${includeMaintenance ? 'bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]' : 'bg-slate-700'}`}></div>
+                </div>
+
+                <div onClick={() => setOverlapEnabled(!overlapEnabled)} className={`flex items-center justify-between p-4 rounded-2xl border cursor-pointer transition-all ${overlapEnabled ? 'bg-emerald-600/10 border-emerald-500/30 text-emerald-500' : 'bg-[var(--bg-main)] border-[var(--border-color)] opacity-40'}`}>
+                  <div className="flex items-center gap-3">
+                    <Zap size={18} />
+                    <span className="text-xs font-black uppercase tracking-widest">{t('overlap_enabled') || 'Solapamiento (Overlap)'}</span>
+                  </div>
+                  <div className={`w-3 h-3 rounded-full ${overlapEnabled ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-700'}`}></div>
+                </div>
+
+                <div className="space-y-3 p-4 bg-[var(--bg-main)]/50 rounded-2xl border border-[var(--border-color)]">
+                  <div onClick={() => setSplitOpsEnabled(!splitOpsEnabled)} className="flex items-center justify-between cursor-pointer group">
+                    <div className="flex items-center gap-3">
+                      <RefreshCw size={18} className={splitOpsEnabled ? 'text-blue-500' : 'text-[var(--text-muted)] group-hover:text-[var(--text-main)]'} />
+                      <span className={`text-[10px] font-black uppercase tracking-widest ${splitOpsEnabled ? 'text-blue-500' : 'text-[var(--text-muted)]'}`}>Dividir OP (Splitting)</span>
+                    </div>
+                    <div className={`w-3 h-3 rounded-full transition-all ${splitOpsEnabled ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]' : 'bg-slate-700'}`}></div>
+                  </div>
+
+                  {splitOpsEnabled && (
+                    <div className="pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                      <label className="text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest mb-1 block">Máx Equipos por OP</label>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => setMaxSplitMachines(Math.max(1, maxSplitMachines - 1))} className="size-8 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center font-bold text-xs hover:border-blue-500">-</button>
+                        <div className="flex-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg h-8 flex items-center justify-center font-black text-xs text-blue-500">{maxSplitMachines}</div>
+                        <button onClick={() => setMaxSplitMachines(Math.min(10, maxSplitMachines + 1))} className="size-8 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center font-bold text-xs hover:border-blue-500">+</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <p className="text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest px-1">{t('deadline')}</p>
@@ -359,6 +462,88 @@ const SimulationPage: React.FC = () => {
                     <RefreshCw className={isSyncing ? 'animate-spin' : ''} size={14} />
                     {isSyncing ? t('calculating') + '...' : t('sync_erp')}
                   </button>
+                </div>
+
+                {/* Center Load Analysis section */}
+                <div className="glass-panel rounded-[2rem] p-8 border border-[var(--border-color)] shadow-2xl space-y-8 bg-gradient-to-br from-[var(--bg-card)] to-[var(--bg-main)]">
+                  <div className="flex items-center justify-between border-b border-[var(--border-color)] pb-6">
+                    <div>
+                      <h3 className="text-2xl font-black uppercase tracking-tighter">{t('work_center_load')}</h3>
+                      <p className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-[0.2em] mt-1">{t('saturation_analysis')}</p>
+                    </div>
+                    <div className="p-4 bg-indigo-500/10 rounded-2xl text-indigo-500 border border-indigo-500/20">
+                      <Cpu size={28} />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {workCenters.map(wc => {
+                      const wcOps = proposedOperations.filter(op => op.work_center_id === wc.id);
+                      const totalRunTime = wcOps.reduce((acc, op) => acc + (op.run_time_minutes || 0) + (op.setup_time_minutes || 0), 0);
+
+                      // Get all machines for this WC to calculate shift-based capacity
+                      const wcMachines = (activeScenario as any)?.machines_data?.filter((m: any) => m.work_center_id === wc.id) || [];
+                      const machineCount = virtualMachines[wc.id] || wcMachines.length || 1;
+
+                      // Average hours from machines in this WC, or default to 8
+                      const avgDailyHours = wcMachines.length > 0
+                        ? wcMachines.reduce((acc: number, m: any) => acc + (m.shift?.daily_capacity_hours || 8), 0) / wcMachines.length
+                        : 8;
+                      // Use dynamic horizon based on filters
+                      const dtFrom = new Date(filters.fromDate || new Date());
+                      const dtTo = new Date(filters.toDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
+
+                      // Capacity = (Average Individual Capacity) * Machine Count
+                      const avgIndividualCapacity = wcMachines.length > 0
+                        ? wcMachines.reduce((acc: number, m: any) => acc + calculateCapacityForPeriod(dtFrom, dtTo, m), 0) / wcMachines.length
+                        : 8 * 60 * calculateWorkingDays(dtFrom, dtTo);
+
+                      const totalCapacityMinutes = avgIndividualCapacity * machineCount;
+                      const realLoadPercentage = Math.round((totalRunTime / totalCapacityMinutes) * 100);
+                      const loadBarWidth = Math.min(100, isNaN(realLoadPercentage) ? 0 : realLoadPercentage);
+                      const isHighLoad = realLoadPercentage > 85;
+
+                      return (
+                        <div key={wc.id} className="bg-[var(--bg-sidebar)] p-5 rounded-3xl border border-[var(--border-color)] group hover:border-indigo-500/40 transition-all shadow-lg relative overflow-hidden">
+                          {isHighLoad && (
+                            <div className="absolute top-0 right-0 p-2">
+                              <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shadow-[0_0_10px_rgba(244,63,94,0.8)]"></div>
+                            </div>
+                          )}
+
+                          <div className="space-y-4">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h5 className="text-xs font-black uppercase text-[var(--text-muted)] tracking-widest leading-none mb-1">{wc.name}</h5>
+                                <p className="text-[10px] font-bold text-indigo-400">
+                                  {t('machines_count', { count: machineCount })} • {Math.round(totalCapacityMinutes / 60)}h Total
+                                </p>
+                                <p className="text-[9px] font-medium text-[var(--text-muted)] flex items-center gap-1 mt-1">
+                                  <Calendar size={10} className="text-indigo-400/60" />
+                                  {dtFrom.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} - {dtTo.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                                </p>
+                              </div>
+                              <span className={`text-lg font-black ${isHighLoad ? 'text-rose-500' : 'text-indigo-500'}`}>{isNaN(realLoadPercentage) ? 0 : realLoadPercentage}%</span>
+                            </div>
+
+                            <div className="h-3 bg-[var(--bg-main)] rounded-full overflow-hidden border border-[var(--border-color)]">
+                              <div
+                                className={`h-full transition-all duration-1000 ease-out rounded-full ${isHighLoad ? 'bg-gradient-to-r from-rose-600 to-rose-400' : 'bg-gradient-to-r from-indigo-600 to-indigo-400'}`}
+                                style={{ width: `${loadBarWidth}%` }}
+                              ></div>
+                            </div>
+
+                            <div className="flex justify-between text-[9px] font-black uppercase tracking-widest">
+                              <span className="text-[var(--text-muted)]">{t('load')}: {Math.round(totalRunTime / 60)}h / {Math.round(totalCapacityMinutes / 60)}h</span>
+                              <span className={isHighLoad ? 'text-rose-500 animate-pulse' : 'text-emerald-500'}>
+                                {isHighLoad ? t('saturated') : t('operational')}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 xl:grid-cols-[1.4fr_0.6fr] gap-6">
@@ -442,74 +627,6 @@ const SimulationPage: React.FC = () => {
                         </tbody>
                       </table>
                     </div>
-                  </div>
-                </div>
-
-                {/* Center Load Analysis section */}
-                <div className="glass-panel rounded-[2rem] p-8 border border-[var(--border-color)] shadow-2xl space-y-8 bg-gradient-to-br from-[var(--bg-card)] to-[var(--bg-main)]">
-                  <div className="flex items-center justify-between border-b border-[var(--border-color)] pb-6">
-                    <div>
-                      <h3 className="text-2xl font-black uppercase tracking-tighter">{t('work_center_load')}</h3>
-                      <p className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-[0.2em] mt-1">{t('saturation_analysis')}</p>
-                    </div>
-                    <div className="p-4 bg-indigo-500/10 rounded-2xl text-indigo-500 border border-indigo-500/20">
-                      <Cpu size={28} />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {workCenters.map(wc => {
-                      const wcOps = proposedOperations.filter(op => op.work_center_id === wc.id);
-                      const totalRunTime = wcOps.reduce((acc, op) => acc + (op.run_time_minutes || 0) + (op.setup_time_minutes || 0), 0);
-
-                      // Get all machines for this WC to calculate shift-based capacity
-                      const wcMachines = (activeScenario as any)?.machines_data?.filter((m: any) => m.work_center_id === wc.id) || [];
-                      const machineCount = virtualMachines[wc.id] || wcMachines.length || 1;
-
-                      // Average hours from machines in this WC, or default to 8
-                      const avgDailyHours = wcMachines.length > 0
-                        ? wcMachines.reduce((acc: number, m: any) => acc + (m.shift?.daily_capacity_hours || 8), 0) / wcMachines.length
-                        : 8;
-
-                      // Capacity = Virtual Machines * Avg Shift Hours * 30 days (standard horizon)
-                      const totalCapacityMinutes = machineCount * avgDailyHours * 60 * 30;
-                      const loadPercentage = Math.min(100, Math.round((totalRunTime / totalCapacityMinutes) * 100));
-                      const isHighLoad = loadPercentage > 85;
-
-                      return (
-                        <div key={wc.id} className="bg-[var(--bg-sidebar)] p-5 rounded-3xl border border-[var(--border-color)] group hover:border-indigo-500/40 transition-all shadow-lg relative overflow-hidden">
-                          {isHighLoad && (
-                            <div className="absolute top-0 right-0 p-2">
-                              <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shadow-[0_0_10px_rgba(244,63,94,0.8)]"></div>
-                            </div>
-                          )}
-
-                          <div className="space-y-4">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <h5 className="text-xs font-black uppercase text-[var(--text-muted)] tracking-widest leading-none mb-1">{wc.name}</h5>
-                                <p className="text-[10px] font-bold text-indigo-400">{t('machines_count', { count: machineCount })} • {t('hours_shift', { hours: avgDailyHours })}</p>
-                              </div>
-                              <span className={`text-lg font-black ${isHighLoad ? 'text-rose-500' : 'text-indigo-500'}`}>{loadPercentage}%</span>
-                            </div>
-
-                            <div className="h-3 bg-[var(--bg-main)] rounded-full overflow-hidden border border-[var(--border-color)]">
-                              <div
-                                className={`h-full transition-all duration-1000 ease-out rounded-full ${isHighLoad ? 'bg-gradient-to-r from-rose-600 to-rose-400' : 'bg-gradient-to-r from-indigo-600 to-indigo-400'}`}
-                                style={{ width: `${loadPercentage}%` }}
-                              ></div>
-                            </div>
-
-                            <div className="flex justify-between text-[9px] font-black uppercase tracking-widest">
-                              <span className="text-[var(--text-muted)]">{t('load')}: {Math.round(totalRunTime / 60)}h / {Math.round(totalCapacityMinutes / 60)}h</span>
-                              <span className={isHighLoad ? 'text-rose-500 animate-pulse' : 'text-emerald-500'}>
-                                {isHighLoad ? t('saturated') : t('operational')}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
                   </div>
                 </div>
               </div>
