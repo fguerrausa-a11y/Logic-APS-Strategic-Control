@@ -49,7 +49,7 @@ export const apsAlgorithm = {
         Array.from(allWCs).forEach(wcId => {
             const realWCMachines = data.machines.filter(m => m.work_center_id === wcId);
             const overrideCount = machineOverrides[wcId];
-            const targetCount = overrideCount !== undefined ? Number(overrideCount) : realWCMachines.length;
+            const targetCount = overrideCount !== undefined ? Number(overrideCount) : Math.max(realWCMachines.length, 1);
 
             for (let i = 0; i < targetCount; i++) {
                 const realM = realWCMachines[i];
@@ -258,9 +258,10 @@ export const apsAlgorithm = {
                     const wc = workCenters.find(w => w.id === route.work_center_id);
                     const wcEfficiency = Number(wc?.efficiency_factor || 1.0);
 
-                    // Strategy parameters - REINFORCED
-                    const isSplitActive = Boolean(settings.simulation_overrides?.split_ops_enabled && !isLocked);
-                    const userSplitLimit = Number(settings.simulation_overrides?.max_split_machines || 1);
+                    // Strategy parameters - WORK CENTER SPECIFIC - REINFORCED
+                    const wcConfig = settings.simulation_overrides?.work_center_configs?.[route.work_center_id];
+                    const isSplitActive = Boolean(wcConfig?.enabled && !isLocked);
+                    const userSplitLimit = Number(wcConfig?.maxSplit || 1);
 
                     // We split by MIN(User Limit, Available Capacity)
                     const availableMachinesCount = mtrs.length;
@@ -278,7 +279,9 @@ export const apsAlgorithm = {
                         if (qtyForThisMachine <= 0) break;
 
                         // UNIQUE MACHINE ASSIGNMENT: Prefer machines not already used for this split
-                        const chosenM = mtrs[i % mtrs.length].id;
+                        const machineToUse = mtrs[i % mtrs.length];
+                        if (!machineToUse) continue;
+                        const chosenM = machineToUse.id;
 
                         // OVERLAP LOGIC for this sub-lot
                         let minStart = nextStepMinStart;

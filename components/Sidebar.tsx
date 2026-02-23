@@ -209,7 +209,7 @@ const Sidebar: React.FC = () => {
           <p className="text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest mb-2 flex items-center gap-2">
             <Cpu size={12} className="text-indigo-500" /> {t('active_scenario')}
           </p>
-          <div className="relative">
+          <div className="relative" onMouseLeave={() => setIsSimDropdownOpen(false)}>
             <div
               onClick={() => setIsSimDropdownOpen(!isSimDropdownOpen)}
               className="w-full bg-[var(--bg-main)] border border-indigo-500/30 rounded-xl px-3 py-2 flex items-center justify-between cursor-pointer hover:border-indigo-500 group transition-all"
@@ -221,67 +221,78 @@ const Sidebar: React.FC = () => {
             </div>
 
             {isSimDropdownOpen && (
-              <div className="absolute bottom-full left-0 mb-2 w-[240px] bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-bottom-2">
-                <div className="p-3 border-b border-[var(--border-color)] bg-[var(--bg-sidebar)] flex justify-between items-center">
-                  <span className="text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest">
-                    {selectedIds.length > 0 ? t('selected_count', { count: selectedIds.length }) : t('select_simulation')}
-                  </span>
-                  {selectedIds.length > 0 && (
-                    <button
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        if (confirm(t('delete_msg_multiple', { count: selectedIds.length }))) {
-                          await deleteScenarios(selectedIds);
-                          setSelectedIds([]);
-                        }
-                      }}
-                      className="text-rose-500 p-1 hover:bg-rose-500/10 rounded-lg transition-all"
-                      title={t('delete')}
-                    >
-                      <Trash2 size={14} />
+              <div className="absolute bottom-full left-0 w-[280px] pb-2 z-50 animate-in fade-in slide-in-from-bottom-2">
+                <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl shadow-2xl overflow-hidden">
+                  <div className="p-3 border-b border-[var(--border-color)] bg-[var(--bg-sidebar)] flex justify-between items-center">
+                    <span className="text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest">
+                      {selectedIds.length > 0 ? t('selected_count', { count: selectedIds.length }) : t('select_simulation')}
+                    </span>
+                    {selectedIds.length > 0 && (
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (confirm(t('delete_msg_multiple', { count: selectedIds.length }))) {
+                            await deleteScenarios(selectedIds);
+                            setSelectedIds([]);
+                          }
+                        }}
+                        className="text-rose-500 p-1 hover:bg-rose-500/10 rounded-lg transition-all"
+                        title={t('delete')}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                    <button onClick={(e) => { e.stopPropagation(); setIsSimDropdownOpen(false); }} className="text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors">
+                      <X size={14} />
                     </button>
-                  )}
-                  <button onClick={(e) => { e.stopPropagation(); setIsSimDropdownOpen(false); }} className="text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors">
-                    <X size={14} />
-                  </button>
-                </div>
-                <div className="max-h-[300px] overflow-y-auto custom-scrollbar p-1">
-                  {scenarios.map((s, idx) => (
-                    <div
-                      key={s.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (e.shiftKey && lastSelectedIndex !== null) {
-                          const start = Math.min(lastSelectedIndex, idx);
-                          const end = Math.max(lastSelectedIndex, idx);
-                          const rangeIds = scenarios.slice(start, end + 1).map(sc => sc.id);
-                          setSelectedIds(prev => Array.from(new Set([...prev, ...rangeIds])));
-                        } else {
-                          setSelectedScenarioId(s.id);
-                          setLastSelectedIndex(idx);
-                        }
-                      }}
-                      className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-all group ${selectedScenarioId === s.id ? 'bg-indigo-600/10 text-indigo-500' : 'hover:bg-indigo-500/5 text-[var(--text-main)]'}`}
-                    >
+                  </div>
+                  <div className="max-h-[300px] overflow-y-auto custom-scrollbar p-1">
+                    {scenarios.map((s, idx) => (
                       <div
+                        key={s.id}
                         onClick={(e) => {
                           e.stopPropagation();
-                          const next = selectedIds.includes(s.id)
-                            ? selectedIds.filter(id => id !== s.id)
-                            : [...selectedIds, s.id];
-                          setSelectedIds(next);
-                          setLastSelectedIndex(idx);
+                          if (e.shiftKey && lastSelectedIndex !== null) {
+                            const start = Math.min(lastSelectedIndex, idx);
+                            const end = Math.max(lastSelectedIndex, idx);
+                            const rangeIds = scenarios.slice(start, end + 1).map(sc => sc.id);
+                            setSelectedIds(prev => Array.from(new Set([...prev, ...rangeIds])));
+                          } else {
+                            setSelectedScenarioId(s.id);
+                            setLastSelectedIndex(idx);
+                          }
                         }}
-                        className={`shrink-0 transition-colors ${selectedIds.includes(s.id) ? 'text-indigo-500' : 'text-[var(--text-muted)] group-hover:text-indigo-400'}`}
+                        className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-all group ${selectedScenarioId === s.id ? 'bg-indigo-600/10 text-indigo-500' : 'hover:bg-indigo-500/5 text-[var(--text-main)]'}`}
                       >
-                        {selectedIds.includes(s.id) ? <CheckSquare size={14} /> : <Square size={14} />}
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const next = selectedIds.includes(s.id)
+                              ? selectedIds.filter(id => id !== s.id)
+                              : [...selectedIds, s.id];
+                            setSelectedIds(next);
+                            setLastSelectedIndex(idx);
+                          }}
+                          className={`shrink-0 transition-colors ${selectedIds.includes(s.id) ? 'text-indigo-500' : 'text-[var(--text-muted)] group-hover:text-indigo-400'}`}
+                        >
+                          {selectedIds.includes(s.id) ? <CheckSquare size={14} /> : <Square size={14} />}
+                        </div>
+                        <div className="flex-1 overflow-hidden">
+                          <div className="flex items-center gap-2">
+                            <p className="text-[11px] font-bold truncate leading-none">
+                              {s.name.replace(' (Real)', '')}
+                            </p>
+                            {s.name.includes('(Real)') && (
+                              <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-500 text-[8px] font-black uppercase tracking-tighter shrink-0 border border-emerald-500/20">
+                                Real
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[8px] font-bold opacity-40 uppercase mt-1">{new Date(s.created_at).toLocaleDateString(language === 'es' ? 'es-AR' : 'en-US')}</p>
+                        </div>
                       </div>
-                      <div className="flex-1 overflow-hidden">
-                        <p className="text-[11px] font-bold truncate leading-none">{s.name}</p>
-                        <p className="text-[8px] font-bold opacity-40 uppercase mt-1">{new Date(s.created_at).toLocaleDateString(language === 'es' ? 'es-AR' : 'en-US')}</p>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </div>
             )}

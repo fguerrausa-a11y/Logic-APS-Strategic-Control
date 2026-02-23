@@ -79,6 +79,7 @@ const OperationDetailPanel: React.FC<{ operation: any; allOperations: any[]; onC
           const siblings = allOperations.filter(o =>
             o.work_order_id === operation.work_order_id &&
             o.operation_sequence === operation.operation_sequence &&
+            o.work_center_id === operation.work_center_id &&
             o.id !== operation.id
           );
           if (siblings.length === 0) return null;

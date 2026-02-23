@@ -25,7 +25,8 @@ import {
   ShieldCheck,
   Sun,
   Zap,
-  Calendar
+  Calendar,
+  RotateCcw
 } from 'lucide-react';
 import { useTranslation } from '../services/languageService';
 
@@ -167,8 +168,7 @@ const SimulationPage: React.FC = () => {
   const [virtualMachines, setVirtualMachines] = useState<Record<string, number>>({});
   const [includeMaintenance, setIncludeMaintenance] = useState(true);
   const [overlapEnabled, setOverlapEnabled] = useState(false);
-  const [splitOpsEnabled, setSplitOpsEnabled] = useState(false);
-  const [maxSplitMachines, setMaxSplitMachines] = useState(2);
+  const [wcSplitConfigs, setWcSplitConfigs] = useState<Record<string, { enabled: boolean, maxSplit: number }>>({});
   const [filters, setFilters] = useState({
     fromDate: new Date().toISOString().split('T')[0],
     toDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -241,8 +241,7 @@ const SimulationPage: React.FC = () => {
       }
       setIncludeMaintenance(scenario.include_maintenance ?? true);
       setOverlapEnabled(scenario.simulation_overrides?.overlap_enabled ?? false);
-      setSplitOpsEnabled(scenario.simulation_overrides?.split_ops_enabled ?? false);
-      setMaxSplitMachines(scenario.simulation_overrides?.max_split_machines ?? 2);
+      setWcSplitConfigs(scenario.simulation_overrides?.work_center_configs || {});
 
       const savedFilters = scenario.simulation_overrides?.filters || filters;
       if (Array.isArray(savedFilters.orderIds)) {
@@ -317,7 +316,10 @@ const SimulationPage: React.FC = () => {
     setIsExecuting(true);
     setSimulationProgress(0);
     try {
-      const name = `${t('simulation_name_prefix')} ${new Date().toLocaleString(language === 'es' ? 'es-AR' : 'en-US')}`;
+      let name = `${t('simulation_name_prefix')} ${new Date().toLocaleString(language === 'es' ? 'es-AR' : 'en-US')}`;
+      if (isRealCapacity && !overlapEnabled && Object.keys(wcSplitConfigs).length === 0) {
+        name += ' (Real)';
+      }
       const { data: { user } } = await supabase.auth.getUser();
       // Fallback ID for development stability (matches existing data)
       const userId = user?.id || "44f60375-a5e9-4c37-a52e-92db947dafd9";
@@ -329,8 +331,7 @@ const SimulationPage: React.FC = () => {
         simulation_overrides: {
           machine_counts: virtualMachines,
           overlap_enabled: overlapEnabled,
-          split_ops_enabled: splitOpsEnabled,
-          max_split_machines: maxSplitMachines,
+          work_center_configs: wcSplitConfigs,
           filters: { ...filters, orderIds: typeof filters.orderIds === 'string' ? (filters.orderIds ? filters.orderIds.split(',').map(s => s.trim()) : []) : filters.orderIds }
         }
       }).select().single();
@@ -344,6 +345,14 @@ const SimulationPage: React.FC = () => {
       alert(t('error') + ": " + error.message);
     }
     setIsExecuting(false);
+  };
+
+  const isRealCapacity = JSON.stringify(virtualMachines) === JSON.stringify(defaultMachineCounts);
+  const handleResetToReal = () => {
+    setVirtualMachines(defaultMachineCounts);
+    setOverlapEnabled(false);
+    setWcSplitConfigs({});
+    setIncludeMaintenance(true);
   };
 
   return (
@@ -390,27 +399,6 @@ const SimulationPage: React.FC = () => {
                   </div>
                   <div className={`w-3 h-3 rounded-full ${overlapEnabled ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-700'}`}></div>
                 </div>
-
-                <div className="space-y-3 p-4 bg-[var(--bg-main)]/50 rounded-2xl border border-[var(--border-color)]">
-                  <div onClick={() => setSplitOpsEnabled(!splitOpsEnabled)} className="flex items-center justify-between cursor-pointer group">
-                    <div className="flex items-center gap-3">
-                      <RefreshCw size={18} className={splitOpsEnabled ? 'text-blue-500' : 'text-[var(--text-muted)] group-hover:text-[var(--text-main)]'} />
-                      <span className={`text-[10px] font-black uppercase tracking-widest ${splitOpsEnabled ? 'text-blue-500' : 'text-[var(--text-muted)]'}`}>Dividir OP (Splitting)</span>
-                    </div>
-                    <div className={`w-3 h-3 rounded-full transition-all ${splitOpsEnabled ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]' : 'bg-slate-700'}`}></div>
-                  </div>
-
-                  {splitOpsEnabled && (
-                    <div className="pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                      <label className="text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest mb-1 block">Máx Equipos por OP</label>
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => setMaxSplitMachines(Math.max(1, maxSplitMachines - 1))} className="size-8 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center font-bold text-xs hover:border-blue-500">-</button>
-                        <div className="flex-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg h-8 flex items-center justify-center font-black text-xs text-blue-500">{maxSplitMachines}</div>
-                        <button onClick={() => setMaxSplitMachines(Math.min(10, maxSplitMachines + 1))} className="size-8 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center font-bold text-xs hover:border-blue-500">+</button>
-                      </div>
-                    </div>
-                  )}
-                </div>
                 <div className="space-y-2">
                   <p className="text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest px-1">{t('deadline')}</p>
                   <input type="date" value={filters.toDate} onChange={e => setFilters({ ...filters, toDate: e.target.value })} className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl p-3 text-xs font-bold outline-none focus:border-indigo-500" />
@@ -426,20 +414,60 @@ const SimulationPage: React.FC = () => {
             </section>
 
             <section className="space-y-6">
-              <h3 className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--border-color)] pb-2"><Cpu size={14} /> {t('installed_capacity')}</h3>
+              <div className="flex items-center justify-between border-b border-[var(--border-color)] pb-2 mb-2">
+                <h3 className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest flex items-center gap-2">
+                  <Cpu size={14} /> {t('installed_capacity')}
+                </h3>
+                {!isRealCapacity && (
+                  <button
+                    onClick={handleResetToReal}
+                    className="text-[8px] font-black text-amber-500 hover:text-amber-400 uppercase flex items-center gap-1 transition-all group"
+                    title="Volver a Capacidad ERP (Real)"
+                  >
+                    <RotateCcw size={10} className="group-hover:rotate-[-180deg] transition-transform duration-500" /> {t('reset') || 'Real'}
+                  </button>
+                )}
+              </div>
               <div className="space-y-3">
                 {workCenters.map(wc => {
                   const isSaturated = bottlenecks.includes(wc.id);
                   return (
-                    <div key={wc.id} className={`flex justify-between items-center p-4 rounded-2xl border transition-all duration-500 ${isSaturated ? 'bg-rose-500/10 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.2)]' : 'bg-[var(--bg-card)] border-[var(--border-color)] shadow-sm'}`}>
-                      <div className="flex-1 min-w-0 pr-2">
-                        <span className={`text-xs font-black uppercase tracking-tighter truncate block ${isSaturated ? 'text-rose-500' : ''}`}>{wc.name}</span>
-                        <p className="text-[8px] font-bold text-[var(--text-muted)] mt-0.5 uppercase">{t('active_machines')}</p>
+                    <div key={wc.id} className={`flex flex-col p-4 rounded-2xl border transition-all duration-500 gap-3 ${isSaturated ? 'bg-rose-500/10 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.2)]' : 'bg-[var(--bg-card)] border-[var(--border-color)] shadow-sm'}`}>
+                      <div className="flex justify-between items-center">
+                        <div className="flex-1 min-w-0 pr-2">
+                          <span className={`text-xs font-black uppercase tracking-tighter truncate block ${isSaturated ? 'text-rose-500' : ''}`}>{wc.name}</span>
+                          <p className="text-[8px] font-bold text-[var(--text-muted)] mt-0.5 uppercase">{t('machines')}</p>
+                        </div>
+                        <div className="flex items-center gap-1 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl p-1 shrink-0 scale-90">
+                          <button onClick={() => setVirtualMachines(v => ({ ...v, [wc.id]: Math.max(0, (v[wc.id] || 0) - 1) }))} className="w-6 h-6 rounded-lg bg-[var(--bg-card)] hover:border-indigo-500/30 border border-transparent font-black text-xs transition-all">-</button>
+                          <div className="relative">
+                            <span className={`w-5 text-center text-[10px] font-black flex justify-center ${virtualMachines[wc.id] === 0 ? 'text-rose-500' : isSaturated ? 'text-rose-500' : virtualMachines[wc.id] !== defaultMachineCounts[wc.id] ? 'text-amber-500' : 'text-indigo-600'}`}>
+                              {virtualMachines[wc.id] || 0}
+                            </span>
+                            {virtualMachines[wc.id] !== defaultMachineCounts[wc.id] && (
+                              <div className="absolute -top-1 -right-1 w-1 h-1 rounded-full bg-amber-500 animate-pulse" title="Diferente a Real"></div>
+                            )}
+                          </div>
+                          <button onClick={() => setVirtualMachines(v => ({ ...v, [wc.id]: (v[wc.id] || 0) + 1 }))} className="w-6 h-6 rounded-lg bg-[var(--bg-card)] hover:border-indigo-500/30 border border-transparent font-black text-xs transition-all">+</button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl p-1 shrink-0">
-                        <button onClick={() => setVirtualMachines(v => ({ ...v, [wc.id]: Math.max(0, (v[wc.id] || 0) - 1) }))} className="w-8 h-8 rounded-lg bg-[var(--bg-card)] hover:border-indigo-500/30 border border-transparent font-black text-sm transition-all">-</button>
-                        <span className={`w-6 text-center text-xs font-black ${virtualMachines[wc.id] === 0 ? 'text-rose-500' : isSaturated ? 'text-rose-500' : 'text-indigo-600'}`}>{virtualMachines[wc.id] || 0}</span>
-                        <button onClick={() => setVirtualMachines(v => ({ ...v, [wc.id]: (v[wc.id] || 0) + 1 }))} className="w-8 h-8 rounded-lg bg-[var(--bg-card)] hover:border-indigo-500/30 border border-transparent font-black text-sm transition-all">+</button>
+
+                      <div className="flex items-center justify-between border-t border-[var(--border-color)] pt-3">
+                        <div className="flex items-center gap-2 cursor-pointer group" onClick={() => setWcSplitConfigs(c => ({ ...c, [wc.id]: { enabled: !c[wc.id]?.enabled, maxSplit: c[wc.id]?.maxSplit || 2 } }))}>
+                          <div className={`w-8 h-4 rounded-full relative transition-all duration-300 ${wcSplitConfigs[wc.id]?.enabled ? 'bg-blue-600' : 'bg-slate-700'}`}>
+                            <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all duration-300`} style={{ left: wcSplitConfigs[wc.id]?.enabled ? '18px' : '2px' }} />
+                          </div>
+                          <span className={`text-[8px] font-bold uppercase tracking-widest ${wcSplitConfigs[wc.id]?.enabled ? 'text-blue-500' : 'text-[var(--text-muted)]'}`}>Split</span>
+                        </div>
+
+                        {wcSplitConfigs[wc.id]?.enabled && (
+                          <div className="flex items-center gap-1 bg-blue-500/5 border border-blue-500/10 rounded-lg p-0.5 animate-in fade-in slide-in-from-right-1">
+                            <span className="text-[7px] font-black text-blue-500 p-1 uppercase">Máx</span>
+                            <button onClick={() => setWcSplitConfigs(c => ({ ...c, [wc.id]: { ...c[wc.id], maxSplit: Math.max(1, (c[wc.id]?.maxSplit || 1) - 1) } }))} className="w-5 h-5 rounded bg-blue-500/10 text-blue-500 font-bold text-[10px]">-</button>
+                            <span className="w-4 text-center text-[10px] font-black text-blue-500">{Math.min(wcSplitConfigs[wc.id]?.maxSplit || 1, virtualMachines[wc.id] || 1)}</span>
+                            <button onClick={() => setWcSplitConfigs(c => ({ ...c, [wc.id]: { ...c[wc.id], maxSplit: Math.min(virtualMachines[wc.id] || 1, (c[wc.id]?.maxSplit || 1) + 1) } }))} className="w-5 h-5 rounded bg-blue-500/10 text-blue-500 font-bold text-[10px]">+</button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );

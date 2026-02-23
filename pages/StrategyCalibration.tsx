@@ -5,6 +5,9 @@ import AIAnalyst from '../components/AIAnalyst';
 import { apsAlgorithm, APSResult } from '../services/apsAlgorithm';
 import { supabase } from '../services/supabaseClient';
 import { useTranslation } from '../services/languageService';
+import { sendMessageToGemini } from '../services/geminiService';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
     Zap,
     Target,
@@ -40,7 +43,7 @@ const calculateCapacityForPeriod = (start: Date, end: Date, machine: any): numbe
         if (shift.days_of_week.includes(curDate.getDay())) {
             totalMinutes += hours * 60;
         }
-        curDate.setDate(curDate.setDate() + 1);
+        curDate.setDate(curDate.getDate() + 1);
     }
     return totalMinutes;
 };
@@ -60,8 +63,12 @@ const StrategyCalibration: React.FC = () => {
         scheduling_mode: 'TOC Optimized',
         bottleneck_management: 'Drum-Buffer-Rope',
         overlap_enabled: true,
-        reprovision_policy: 'MRP Standard'
+        reprovision_policy: 'MRP Standard',
+        work_center_configs: {} as Record<string, { enabled: boolean, maxSplit: number }>
     });
+
+    const [aiAnalysisHistory, setAiAnalysisHistory] = useState<Array<{ id: string, content: string, timestamp: string, config: any, result: APSResult | null, isError?: boolean }>>([]);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
 
     useEffect(() => {
         fetchBaseData();
@@ -119,7 +126,8 @@ const StrategyCalibration: React.FC = () => {
                     scheduling_mode: currentSettings.scheduling_mode,
                     bottleneck_management: currentSettings.bottleneck_management,
                     overlap_enabled: currentSettings.overlap_enabled,
-                    reprovision_policy: currentSettings.reprovision_policy || 'TOC Replenishment'
+                    reprovision_policy: currentSettings.reprovision_policy || 'TOC Replenishment',
+                    work_center_configs: currentSettings.simulation_overrides?.work_center_configs || {}
                 });
             }
 
@@ -136,11 +144,90 @@ const StrategyCalibration: React.FC = () => {
         setTimeout(() => {
             const result = apsAlgorithm.calculateAPS({
                 ...data,
-                settings: config
+                settings: {
+                    ...config,
+                    simulation_overrides: {
+                        overlap_enabled: config.overlap_enabled,
+                        work_center_configs: config.work_center_configs
+                    }
+                }
             });
             setSimulation(result);
             setCalibrating(false);
+            generateAIAnalysis(result);
         }, 800);
+    };
+
+    const generateAIAnalysis = async (currentResult: APSResult, retryCount = 0, targetId?: string) => {
+        setIsAnalyzing(true);
+        try {
+            const prompt = `Actúa como el Analista IA Logic. 
+            Este es un análisis HISTÓRICO. Comenta qué está cambiando con esta nueva PREDICCIÓN comparada con la situación base y las anteriores.
+            
+            CONFIGURACIÓN ACTUAL:
+            - Modalidad: ${config.scheduling_mode}
+            - Restricciones: ${config.bottleneck_management}
+            - Reposición: ${config.reprovision_policy}
+            - Overlap: ${config.overlap_enabled ? 'SÍ' : 'NO'}
+            - Splits: ${Object.entries(config.work_center_configs).filter(([_, c]) => c.enabled).map(([id]) => id).join(', ')}
+
+            MÉTRICAS:
+            - Base: OTDR ${baseline?.metrics?.onTimeDeliveryRate}%, LeadTime ${baseline?.metrics?.avgLeadTime}d.
+            - Actual: OTDR ${currentResult.metrics.onTimeDeliveryRate}%, LeadTime ${currentResult.metrics.avgLeadTime}d.
+
+            Analiza el impacto del último cambio y sugiere el próximo paso técnico. Sé directo y usa Markdown.`;
+
+            const analysis = await sendMessageToGemini(prompt, {
+                config,
+                baselineMetrics: baseline?.metrics,
+                currentMetrics: currentResult.metrics,
+                topDelays: currentResult.proposedWorkOrders.slice(0, 5)
+            });
+
+            if (targetId) {
+                // Updating an existing error entry
+                setAiAnalysisHistory(prev => prev.map(entry =>
+                    entry.id === targetId ? { ...entry, content: analysis, isError: false } : entry
+                ));
+            } else {
+                // Adding a new entry
+                const newEntry = {
+                    id: Math.random().toString(36).substr(2, 9),
+                    content: analysis,
+                    timestamp: new Date().toLocaleTimeString(),
+                    config: { ...config },
+                    result: currentResult,
+                    isError: false
+                };
+                setAiAnalysisHistory(prev => [newEntry, ...prev]);
+            }
+        } catch (error) {
+            console.error("AI Analysis failed:", error);
+            if (retryCount < 1 && !targetId) { // Auto-retry only for new entries
+                console.log(`Reintentando análisis (${retryCount + 1}/1)...`);
+                setTimeout(() => generateAIAnalysis(currentResult, retryCount + 1), 2000);
+            } else {
+                const errorContent = "⚠️ **Error de conexión con la IA.** La predicción se calculó correctamente pero el análisis no pudo generarse.";
+
+                if (targetId) {
+                    setAiAnalysisHistory(prev => prev.map(entry =>
+                        entry.id === targetId ? { ...entry, content: errorContent, isError: true } : entry
+                    ));
+                } else {
+                    const errorEntry = {
+                        id: 'error-' + Date.now(),
+                        content: errorContent,
+                        timestamp: new Date().toLocaleTimeString(),
+                        config: { ...config },
+                        result: currentResult,
+                        isError: true
+                    };
+                    setAiAnalysisHistory(prev => [errorEntry, ...prev]);
+                }
+            }
+        } finally {
+            setIsAnalyzing(false);
+        }
     };
 
     if (loading) {
@@ -297,6 +384,52 @@ const StrategyCalibration: React.FC = () => {
                                             <Box size={14} /> Serie Única
                                         </button>
                                     </div>
+
+                                    <div className="space-y-3 pt-4 border-t border-[var(--border-color)]">
+                                        <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest pl-2 flex items-center gap-2">
+                                            <Cpu size={12} /> Configuración de Split
+                                        </label>
+                                        <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                                            {(data?.workCenters || []).map((wc: any) => (
+                                                <div key={wc.id} className="bg-[var(--bg-main)] p-3 rounded-2xl border border-[var(--border-color)] flex items-center justify-between gap-4">
+                                                    <span className="text-[9px] font-black uppercase text-[var(--text-muted)] truncate flex-1">{wc.name}</span>
+                                                    <div className="flex items-center gap-3">
+                                                        <div
+                                                            className={`w-8 h-4 rounded-full relative transition-all cursor-pointer ${config.work_center_configs[wc.id]?.enabled ? 'bg-indigo-500' : 'bg-slate-800'}`}
+                                                            onClick={() => setConfig({
+                                                                ...config,
+                                                                work_center_configs: {
+                                                                    ...config.work_center_configs,
+                                                                    [wc.id]: { enabled: !config.work_center_configs[wc.id]?.enabled, maxSplit: config.work_center_configs[wc.id]?.maxSplit || 2 }
+                                                                }
+                                                            })}
+                                                        >
+                                                            <div className="absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all" style={{ left: config.work_center_configs[wc.id]?.enabled ? '18px' : '2px' }} />
+                                                        </div>
+                                                        {config.work_center_configs[wc.id]?.enabled && (
+                                                            <div className="flex items-center gap-1">
+                                                                <button onClick={() => setConfig({
+                                                                    ...config,
+                                                                    work_center_configs: {
+                                                                        ...config.work_center_configs,
+                                                                        [wc.id]: { ...config.work_center_configs[wc.id], maxSplit: Math.max(1, (config.work_center_configs[wc.id]?.maxSplit || 1) - 1) }
+                                                                    }
+                                                                })} className="w-5 h-5 rounded bg-indigo-500/10 text-indigo-400 font-bold text-[10px]">-</button>
+                                                                <span className="w-4 text-center text-[10px] font-black text-indigo-400">{config.work_center_configs[wc.id]?.maxSplit || 1}</span>
+                                                                <button onClick={() => setConfig({
+                                                                    ...config,
+                                                                    work_center_configs: {
+                                                                        ...config.work_center_configs,
+                                                                        [wc.id]: { ...config.work_center_configs[wc.id], maxSplit: (config.work_center_configs[wc.id]?.maxSplit || 1) + 1 }
+                                                                    }
+                                                                })} className="w-5 h-5 rounded bg-indigo-500/10 text-indigo-400 font-bold text-[10px]">+</button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <button
@@ -315,8 +448,61 @@ const StrategyCalibration: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Impact Visualization */}
-                        <div className="xl:col-span-8 flex flex-col gap-6">
+                        {/* Evolution & Analysis Panel */}
+                        <div className="xl:col-span-8 flex flex-col gap-8">
+                            {/* NEW: AI Analysis Frame */}
+                            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden transition-all">
+                                <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 blur-[80px] -mr-32 -mt-32" />
+                                <div className="flex items-center gap-3 mb-6 relative z-10">
+                                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-600/20">
+                                        <span className="material-symbols-outlined text-white text-xl" translate="no">psychology</span>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-black uppercase tracking-tighter">Análisis del Analista IA</h3>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className={`block size-1.5 rounded-full ${isAnalyzing ? 'bg-indigo-400 animate-pulse' : 'bg-emerald-500'} `}></span>
+                                            <span className="text-[var(--text-muted)] text-[9px] font-black uppercase tracking-widest">{isAnalyzing ? 'Generando Insights...' : 'Análisis Estratégico'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="relative z-10 min-h-[100px]">
+                                    {aiAnalysisHistory.length > 0 ? (
+                                        <div className="flex flex-col gap-6 overflow-y-auto max-h-[600px] pr-4 custom-scrollbar">
+                                            {aiAnalysisHistory.map((entry, idx) => (
+                                                <div key={entry.id} className={`p-6 rounded-3xl border ${idx === 0 ? 'bg-indigo-600/10 border-indigo-500/30 ring-1 ring-indigo-500/20' : 'bg-[var(--bg-main)] border-[var(--border-color)] opacity-60'}`}>
+                                                    <div className="flex justify-between items-center mb-4">
+                                                        <span className="text-[9px] font-black uppercase px-3 py-1 bg-[var(--bg-sidebar)] rounded-full text-indigo-400 border border-indigo-500/20">
+                                                            {idx === 0 ? 'Ejecución más reciente' : `Análisis previo #${aiAnalysisHistory.length - idx}`}
+                                                        </span>
+                                                        <span className="text-[10px] font-bold text-[var(--text-muted)]">{entry.timestamp}</span>
+                                                    </div>
+                                                    <div className="prose prose-invert prose-sm max-w-none text-[var(--text-main)]">
+                                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                                            {entry.content}
+                                                        </ReactMarkdown>
+                                                    </div>
+                                                    {entry.isError && (
+                                                        <button
+                                                            onClick={() => entry.result && generateAIAnalysis(entry.result, 0, entry.id)}
+                                                            className="mt-4 flex items-center gap-2 px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                                                        >
+                                                            <RotateCcw size={12} /> Reintentar Análisis
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="h-full flex flex-col items-center justify-center text-center py-10 opacity-30">
+                                            <Cpu size={32} className="mb-4 text-indigo-500" />
+                                            <p className="text-[10px] font-black uppercase tracking-widest">Lanza una predicción para obtener el análisis de la IA</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Impact Visualization Frame */}
                             <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-[2.5rem] flex-1 flex flex-col p-8 shadow-2xl relative overflow-hidden">
                                 <div className="flex items-center justify-between mb-8">
                                     <div>
@@ -363,11 +549,6 @@ const StrategyCalibration: React.FC = () => {
                                             </div>
                                         );
                                     })}
-                                </div>
-
-                                <div className="mt-8 p-6 bg-indigo-600/5 border border-indigo-500/20 rounded-2xl flex items-center gap-4">
-                                    <Zap className="text-indigo-400" size={20} />
-                                    <p className="text-xs font-medium text-indigo-300/80 italic">La IA sugiere que con "{config.scheduling_mode}" y "{config.overlap_enabled ? 'Overlap Activado' : 'Serie Única'}", optimizas el flujo en el Centro de Mecanizado, reduciendo cuellos de botella.</p>
                                 </div>
                             </div>
                         </div>
