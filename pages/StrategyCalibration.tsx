@@ -6,15 +6,14 @@ import { apsAlgorithm, APSResult } from '../services/apsAlgorithm';
 import { supabase } from '../services/supabaseClient';
 import { useTranslation } from '../services/languageService';
 import { sendMessageToGemini } from '../services/geminiService';
+import { useSimulation } from '../services/SimulationContext';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
     Zap,
     Target,
     TrendingUp,
-    Layers,
     Clock,
-    Box,
     Cpu,
     Play,
     ArrowRight,
@@ -50,6 +49,7 @@ const calculateCapacityForPeriod = (start: Date, end: Date, machine: any): numbe
 
 const StrategyCalibration: React.FC = () => {
     const { t } = useTranslation();
+    const { scenarios, selectedScenarioId } = useSimulation();
     const [loading, setLoading] = useState(false);
     const [calibrating, setCalibrating] = useState(false);
     const [data, setData] = useState<any>(null);
@@ -58,21 +58,29 @@ const StrategyCalibration: React.FC = () => {
     const [baseline, setBaseline] = useState<APSResult | null>(null);
     const [simulation, setSimulation] = useState<APSResult | null>(null);
 
-    // Configuration for "What-If"
+    // El escenario activo que hereda Calibración (de Simulación)
+    const activeScenario = scenarios.find(s => s.id === selectedScenarioId) || scenarios[0] || null;
+    const scenarioOverrides = activeScenario?.simulation_overrides || {};
+
+    // Únicos parámetros editables en Calibración: la estrategia pura
     const [config, setConfig] = useState({
         scheduling_mode: 'TOC Optimized',
         bottleneck_management: 'Drum-Buffer-Rope',
-        overlap_enabled: true,
         reprovision_policy: 'MRP Standard',
-        work_center_configs: {} as Record<string, { enabled: boolean, maxSplit: number }>
     });
 
     const [aiAnalysisHistory, setAiAnalysisHistory] = useState<Array<{ id: string, content: string, timestamp: string, config: any, result: APSResult | null, isError?: boolean }>>([]);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [rawSettings, setRawSettings] = useState<any>(null);
+
+    // Re-calcular baseline cuando cambia el escenario activo
+    useEffect(() => {
+        if (activeScenario) fetchBaseData();
+    }, [selectedScenarioId]);
 
     useEffect(() => {
-        fetchBaseData();
-    }, []);
+        if (!selectedScenarioId && scenarios.length > 0) fetchBaseData();
+    }, [scenarios]);
 
     const fetchBaseData = async () => {
         setLoading(true);
@@ -94,11 +102,42 @@ const StrategyCalibration: React.FC = () => {
                 supabase.from('work_centers').select('*')
             ]);
 
+            if (currentSettings) setRawSettings(currentSettings);
+
+            // Resolver el escenario activo para obtener sus simulation_overrides
+            const scenario = scenarios.find(s => s.id === selectedScenarioId) || scenarios[0] || null;
+            const scOverrides = scenario?.simulation_overrides || {};
+
+            // Construir las máquinas simuladas: si el escenario tiene machine_counts,
+            // expandir/contraer la lista de máquinas para reflejar la capacidad virtual.
+            const realMachines: any[] = machines || [];
+            let simulatedMachines = realMachines;
+            if (scOverrides.machine_counts && Object.keys(scOverrides.machine_counts).length > 0) {
+                const expanded: any[] = [];
+                workCenters?.forEach((wc: any) => {
+                    const wcMachines = realMachines.filter(m => m.work_center_id === wc.id);
+                    const targetCount = scOverrides.machine_counts[wc.id] ?? wcMachines.length;
+                    if (targetCount <= wcMachines.length) {
+                        expanded.push(...wcMachines.slice(0, Math.max(1, targetCount)));
+                    } else {
+                        expanded.push(...wcMachines);
+                        // Añadir máquinas virtuales clonando la primera del WC
+                        const template = wcMachines[0];
+                        if (template) {
+                            for (let i = wcMachines.length; i < targetCount; i++) {
+                                expanded.push({ ...template, id: `${template.id}-V${i}`, is_virtual: true });
+                            }
+                        }
+                    }
+                });
+                simulatedMachines = expanded;
+            }
+
             const baseData = {
                 items: items || [],
                 bom: bom || [],
                 routings: routings || [],
-                machines: machines || [],
+                machines: simulatedMachines,  // ← máquinas del escenario activo
                 workOrders: workOrders || [],
                 erpPurchases: erpPurchases || [],
                 existingOps: [],
@@ -109,25 +148,33 @@ const StrategyCalibration: React.FC = () => {
 
             setData(baseData);
 
-            // Initial run with current settings
-            const initial = apsAlgorithm.calculateAPS({
-                ...baseData,
-                settings: {
-                    scheduling_mode: currentSettings?.scheduling_mode || 'TOC Optimized',
-                    bottleneck_management: currentSettings?.bottleneck_management || 'Drum-Buffer-Rope',
-                    overlap_enabled: currentSettings?.overlap_enabled ?? true
+            // Baseline = escenario activo con su estrategia guardada en aps_settings
+            // (hereda machine_counts, splits y overlap del escenario)
+            const baselineSettings = {
+                scheduling_mode: currentSettings?.scheduling_mode || 'TOC Optimized',
+                bottleneck_management: currentSettings?.bottleneck_management || 'Drum-Buffer-Rope',
+                reprovision_policy: currentSettings?.reprovision_policy || 'MRP Standard',
+                overlap_enabled: scOverrides.overlap_enabled ?? currentSettings?.overlap_enabled ?? false,
+                include_maintenance: scenario?.include_maintenance ?? true,
+                default_buffer_days: currentSettings?.default_buffer_days || 2,
+                planning_horizon_days: currentSettings?.planning_horizon_days || 90,
+                simulation_overrides: {
+                    overlap_enabled: scOverrides.overlap_enabled ?? false,
+                    work_center_configs: scOverrides.work_center_configs || {},
+                    infinite_capacity: currentSettings?.bottleneck_management === 'Infinite Capacity',
                 }
-            });
+            };
+
+            const initial = apsAlgorithm.calculateAPS({ ...baseData, settings: baselineSettings });
             setBaseline(initial);
             setSimulation(initial);
 
+            // Inicializar el config con la estrategia actual de la BD
             if (currentSettings) {
                 setConfig({
-                    scheduling_mode: currentSettings.scheduling_mode,
-                    bottleneck_management: currentSettings.bottleneck_management,
-                    overlap_enabled: currentSettings.overlap_enabled,
-                    reprovision_policy: currentSettings.reprovision_policy || 'TOC Replenishment',
-                    work_center_configs: currentSettings.simulation_overrides?.work_center_configs || {}
+                    scheduling_mode: currentSettings.scheduling_mode || 'TOC Optimized',
+                    bottleneck_management: currentSettings.bottleneck_management || 'Drum-Buffer-Rope',
+                    reprovision_policy: currentSettings.reprovision_policy || 'MRP Standard',
                 });
             }
 
@@ -142,13 +189,27 @@ const StrategyCalibration: React.FC = () => {
         if (!data) return;
         setCalibrating(true);
         setTimeout(() => {
+            const isInfiniteCapacity = config.bottleneck_management === 'Infinite Capacity';
+            // Heredar TODOS los overrides del escenario activo
+            const overrides = activeScenario?.simulation_overrides || {};
+
             const result = apsAlgorithm.calculateAPS({
-                ...data,
+                ...data, // ← data ya tiene las máquinas del escenario (simulatedMachines)
                 settings: {
-                    ...config,
+                    // ── Estrategia: lo único que cambia en Calibración ──
+                    scheduling_mode: config.scheduling_mode,
+                    bottleneck_management: config.bottleneck_management,
+                    reprovision_policy: config.reprovision_policy,
+                    // ── Del escenario: se hereda sin modificar ──
+                    overlap_enabled: overrides.overlap_enabled ?? false,
+                    include_maintenance: activeScenario?.include_maintenance ?? true,
+                    default_buffer_days: rawSettings?.default_buffer_days || 2,
+                    planning_horizon_days: rawSettings?.planning_horizon_days || 90,
                     simulation_overrides: {
-                        overlap_enabled: config.overlap_enabled,
-                        work_center_configs: config.work_center_configs
+                        infinite_capacity: isInfiniteCapacity,
+                        overlap_enabled: overrides.overlap_enabled ?? false,
+                        work_center_configs: overrides.work_center_configs || {},
+                        // machine_counts ya está en data.machines (se expandieron en fetchBaseData)
                     }
                 }
             });
@@ -160,22 +221,30 @@ const StrategyCalibration: React.FC = () => {
 
     const generateAIAnalysis = async (currentResult: APSResult, retryCount = 0, targetId?: string) => {
         setIsAnalyzing(true);
+        const splitsActive = Object.entries(scenarioOverrides.work_center_configs || {})
+            .filter(([_, c]: any) => c.enabled).map(([id]) => id).join(', ') || 'Ninguno';
+        const machineCounts = Object.entries(scenarioOverrides.machine_counts || {})
+            .map(([wc, n]) => `${wc}: ${n}`).join(', ') || 'Real (sin overrides)';
         try {
-            const prompt = `Actúa como el Analista IA Logic. 
+            const prompt = `Actúa como el Analista IA Logic.
             Este es un análisis HISTÓRICO. Comenta qué está cambiando con esta nueva PREDICCIÓN comparada con la situación base y las anteriores.
-            
-            CONFIGURACIÓN ACTUAL:
+
+            ESCENARIO BASE (heredado de Simulación - NO cambia entre runs):
+            - Escenario: "${activeScenario?.name || 'sin escenario'}"
+            - Máquinas virtuales: ${machineCounts}
+            - Splits activos: ${splitsActive}
+            - Overlap: ${scenarioOverrides.overlap_enabled ? 'SÍ' : 'NO'}
+
+            ESTRATEGIA PROBADA EN ESTA PREDICCIÓN:
             - Modalidad: ${config.scheduling_mode}
             - Restricciones: ${config.bottleneck_management}
             - Reposición: ${config.reprovision_policy}
-            - Overlap: ${config.overlap_enabled ? 'SÍ' : 'NO'}
-            - Splits: ${Object.entries(config.work_center_configs).filter(([_, c]) => c.enabled).map(([id]) => id).join(', ')}
 
             MÉTRICAS:
-            - Base: OTDR ${baseline?.metrics?.onTimeDeliveryRate}%, LeadTime ${baseline?.metrics?.avgLeadTime}d.
-            - Actual: OTDR ${currentResult.metrics.onTimeDeliveryRate}%, LeadTime ${currentResult.metrics.avgLeadTime}d.
+            - Base (estrategia guardada): OTDR ${baseline?.metrics?.onTimeDeliveryRate?.toFixed(1)}%, LeadTime ${baseline?.metrics?.avgLeadTime?.toFixed(1)}d.
+            - Predicción (nueva estrategia): OTDR ${currentResult.metrics.onTimeDeliveryRate?.toFixed(1)}%, LeadTime ${currentResult.metrics.avgLeadTime?.toFixed(1)}d.
 
-            Analiza el impacto del último cambio y sugiere el próximo paso técnico. Sé directo y usa Markdown.`;
+            Analiza el impacto del cambio de estrategia y sugiere el próximo paso técnico. Sé directo y usa Markdown.`;
 
             const analysis = await sendMessageToGemini(prompt, {
                 config,
@@ -303,7 +372,10 @@ const StrategyCalibration: React.FC = () => {
                                 let totalUsage = 0;
 
                                 (data.workCenters || []).forEach((wc: any) => {
-                                    const wcMachines = data.machines.filter((m: any) => m.work_center_id === wc.id);
+                                    // FIX 2: excluir máquinas inactivas del cálculo de capacidad
+                                    const wcMachines = data.machines.filter((m: any) =>
+                                        m.work_center_id === wc.id && m.is_active !== false
+                                    );
                                     const wcOps = (simulation.proposedOperations || []).filter((o: any) => o.work_center_id === wc.id);
                                     totalUsage += wcOps.reduce((acc: number, o: any) => acc + (o.run_time_minutes || 0) + (o.setup_time_minutes || 0), 0);
                                     totalCap += wcMachines.reduce((acc: number, m: any) => acc + calculateCapacityForPeriod(start, end, m), 0);
@@ -327,9 +399,30 @@ const StrategyCalibration: React.FC = () => {
                                     </div>
                                     <div>
                                         <h3 className="text-lg font-black uppercase tracking-tighter">Motor Virtual</h3>
-                                        <p className="text-[10px] text-[var(--text-muted)] font-bold">AJUSTA LOS PARÁMETROS DE IA</p>
+                                        <p className="text-[10px] text-[var(--text-muted)] font-bold">AJUSTA LA ESTRATEGIA DE SCHEDULING</p>
                                     </div>
                                 </div>
+
+                                {/* Escenario heredado — read-only */}
+                                {activeScenario && (
+                                    <div className="bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl p-4 space-y-2">
+                                        <p className="text-[8px] font-black text-[var(--text-muted)] uppercase tracking-widest flex items-center gap-1.5">
+                                            <Calendar size={10} /> Escenario Activo (heredado)
+                                        </p>
+                                        <p className="text-sm font-black text-indigo-400 truncate">{activeScenario.name}</p>
+                                        <div className="flex flex-wrap gap-2 pt-1">
+                                            {scenarioOverrides.overlap_enabled && (
+                                                <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[8px] font-black uppercase">Overlap ✓</span>
+                                            )}
+                                            {Object.values(scenarioOverrides.work_center_configs || {}).some((c: any) => c.enabled) && (
+                                                <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 text-[8px] font-black uppercase">Splits ✓</span>
+                                            )}
+                                            {Object.keys(scenarioOverrides.machine_counts || {}).length > 0 && (
+                                                <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-[8px] font-black uppercase">Máquinas Virtuales ✓</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div className="space-y-6">
                                     <div className="space-y-3">
@@ -353,7 +446,7 @@ const StrategyCalibration: React.FC = () => {
                                             onChange={(e) => setConfig({ ...config, bottleneck_management: e.target.value })}
                                         >
                                             <option value="Drum-Buffer-Rope">Drum-Buffer-Rope (DBR)</option>
-                                            <option value="Infinite Capacity">Capacidad Infinita</option>
+                                            <option value="Infinite Capacity">Capacidad Infinita (Sin restricciones)</option>
                                         </select>
                                     </div>
 
@@ -370,65 +463,12 @@ const StrategyCalibration: React.FC = () => {
                                         </select>
                                     </div>
 
-                                    <div className="p-1 bg-[var(--bg-main)] rounded-2xl border border-[var(--border-color)] flex gap-1">
-                                        <button
-                                            onClick={() => setConfig({ ...config, overlap_enabled: true })}
-                                            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-all font-black text-[10px] uppercase ${config.overlap_enabled ? 'bg-indigo-600 text-white shadow-lg' : 'text-[var(--text-muted)] hover:bg-[var(--bg-card)]'}`}
-                                        >
-                                            <Layers size={14} /> Solapar (Overlap)
-                                        </button>
-                                        <button
-                                            onClick={() => setConfig({ ...config, overlap_enabled: false })}
-                                            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-all font-black text-[10px] uppercase ${!config.overlap_enabled ? 'bg-slate-700 text-white shadow-lg' : 'text-[var(--text-muted)] hover:bg-[var(--bg-card)]'}`}
-                                        >
-                                            <Box size={14} /> Serie Única
-                                        </button>
-                                    </div>
-
-                                    <div className="space-y-3 pt-4 border-t border-[var(--border-color)]">
-                                        <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest pl-2 flex items-center gap-2">
-                                            <Cpu size={12} /> Configuración de Split
-                                        </label>
-                                        <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                                            {(data?.workCenters || []).map((wc: any) => (
-                                                <div key={wc.id} className="bg-[var(--bg-main)] p-3 rounded-2xl border border-[var(--border-color)] flex items-center justify-between gap-4">
-                                                    <span className="text-[9px] font-black uppercase text-[var(--text-muted)] truncate flex-1">{wc.name}</span>
-                                                    <div className="flex items-center gap-3">
-                                                        <div
-                                                            className={`w-8 h-4 rounded-full relative transition-all cursor-pointer ${config.work_center_configs[wc.id]?.enabled ? 'bg-indigo-500' : 'bg-slate-800'}`}
-                                                            onClick={() => setConfig({
-                                                                ...config,
-                                                                work_center_configs: {
-                                                                    ...config.work_center_configs,
-                                                                    [wc.id]: { enabled: !config.work_center_configs[wc.id]?.enabled, maxSplit: config.work_center_configs[wc.id]?.maxSplit || 2 }
-                                                                }
-                                                            })}
-                                                        >
-                                                            <div className="absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all" style={{ left: config.work_center_configs[wc.id]?.enabled ? '18px' : '2px' }} />
-                                                        </div>
-                                                        {config.work_center_configs[wc.id]?.enabled && (
-                                                            <div className="flex items-center gap-1">
-                                                                <button onClick={() => setConfig({
-                                                                    ...config,
-                                                                    work_center_configs: {
-                                                                        ...config.work_center_configs,
-                                                                        [wc.id]: { ...config.work_center_configs[wc.id], maxSplit: Math.max(1, (config.work_center_configs[wc.id]?.maxSplit || 1) - 1) }
-                                                                    }
-                                                                })} className="w-5 h-5 rounded bg-indigo-500/10 text-indigo-400 font-bold text-[10px]">-</button>
-                                                                <span className="w-4 text-center text-[10px] font-black text-indigo-400">{config.work_center_configs[wc.id]?.maxSplit || 1}</span>
-                                                                <button onClick={() => setConfig({
-                                                                    ...config,
-                                                                    work_center_configs: {
-                                                                        ...config.work_center_configs,
-                                                                        [wc.id]: { ...config.work_center_configs[wc.id], maxSplit: (config.work_center_configs[wc.id]?.maxSplit || 1) + 1 }
-                                                                    }
-                                                                })} className="w-5 h-5 rounded bg-indigo-500/10 text-indigo-400 font-bold text-[10px]">+</button>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
+                                    {/* Nota informativa */}
+                                    <div className="bg-indigo-500/5 border border-indigo-500/15 rounded-2xl p-4">
+                                        <p className="text-[9px] font-bold text-indigo-400/80 uppercase leading-relaxed">
+                                            Overlap, Splits y Capacidad se heredan del escenario activo.
+                                            Para modificarlos, cambiá la configuración en la pantalla de Simulación.
+                                        </p>
                                     </div>
                                 </div>
 

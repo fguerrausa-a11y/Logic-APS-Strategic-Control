@@ -45,4 +45,5 @@ export const common: Translations = {
     'hours_short': { es: 'h', en: 'h', fr: 'h', de: 'std', pt: 'h', zh: '小时' },
     'seconds_short': { es: 's', en: 's', fr: 's', de: 'sek', pt: 's', zh: '秒' },
     'error': { es: 'Error', en: 'Error', fr: 'Erreur', de: 'Fehler', pt: 'Erro', zh: '错误' },
+    'master_manual': { es: 'Manual Maestro', en: 'Master Manual', fr: 'Manuel de Maître', de: 'Handbuch', pt: 'Manual Mestre', zh: '主手册' },
 };

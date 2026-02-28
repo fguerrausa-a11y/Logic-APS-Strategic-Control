@@ -48,19 +48,29 @@ const MenuSection: React.FC<MenuSectionProps> = ({
 
       <div className={`overflow-hidden transition-all duration-300 flex flex-col gap-1.5 pl-6 ${isExpanded ? 'max-h-[500px] opacity-100 mb-6' : 'max-h-0 opacity-0'}`}>
         <div className="absolute left-7 top-0 bottom-0 w-px bg-indigo-500/20 ml-1"></div>
-        {items.map((item) => (
-          <Link
-            key={item.path}
-            to={item.path}
-            className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all border border-transparent ${activePage === item.path
-              ? 'bg-indigo-600/10 border-indigo-500/20 text-indigo-500 shadow-sm'
-              : 'text-[var(--text-muted)] hover:text-indigo-400 hover:translate-x-1.5'
-              }`}
-          >
-            <span className={`material-symbols-outlined text-[20px] ${activePage === item.path ? '' : 'opacity-50'}`} translate="no">{item.icon}</span>
-            <span className="text-[14px] font-extrabold tracking-tight">{item.name}</span>
-          </Link>
-        ))}
+        {items.map((item) => {
+          const isExternal = item.path.startsWith('/docs');
+          const content = (
+            <>
+              <span className={`material-symbols-outlined text-[20px] ${activePage === item.path ? '' : 'opacity-50'}`} translate="no">{item.icon}</span>
+              <span className="text-[14px] font-extrabold tracking-tight">{item.name}</span>
+            </>
+          );
+          const className = `flex items-center gap-4 px-4 py-3 rounded-xl transition-all border border-transparent ${activePage === item.path
+            ? 'bg-indigo-600/10 border-indigo-500/20 text-indigo-500 shadow-sm'
+            : 'text-[var(--text-muted)] hover:text-indigo-400 hover:translate-x-1.5'
+            }`;
+
+          return isExternal ? (
+            <a key={item.path} href={item.path} target="_blank" rel="noopener noreferrer" className={className}>
+              {content}
+            </a>
+          ) : (
+            <Link key={item.path} to={item.path} className={className}>
+              {content}
+            </Link>
+          );
+        })}
       </div>
     </div>
   );
@@ -142,6 +152,7 @@ const Sidebar: React.FC = () => {
 
   const configItems: NavItem[] = [
     { name: t('settings'), icon: 'settings', path: '/settings' },
+    { name: t('master_manual'), icon: 'menu_book', path: '/docs/index.html' },
   ];
 
   useEffect(() => {
@@ -314,8 +325,8 @@ const Sidebar: React.FC = () => {
           <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={() => {
-                const current = (document.documentElement.getAttribute('data-theme') as 'light' | 'dark') || 'dark';
-                const next = current === 'dark' ? 'light' : 'dark';
+                const current = (document.documentElement.getAttribute('data-theme') as 'light' | 'dark') || 'light';
+                const next = current === 'light' ? 'dark' : 'light';
                 document.documentElement.setAttribute('data-theme', next);
                 localStorage.setItem('theme', next);
                 window.dispatchEvent(new Event('storage'));
@@ -324,7 +335,7 @@ const Sidebar: React.FC = () => {
               title={t('visual_aesthetic')}
             >
               <span className="material-symbols-outlined text-[20px]" translate="no">
-                {document.documentElement.getAttribute('data-theme') === 'light' ? 'light_mode' : 'dark_mode'}
+                {document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark_mode' : 'light_mode'}
               </span>
             </button>
             <button

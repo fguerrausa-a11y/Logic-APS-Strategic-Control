@@ -128,7 +128,7 @@ const AIAnalyst: React.FC<AIAnalystProps> = ({ simulationData }) => {
                 ? 'bg-[var(--bg-card)] rounded-tl-none border-indigo-500/20 text-[var(--text-main)] shadow-sm'
                 : 'bg-[var(--bg-main)] rounded-tr-none border-[var(--border-color)] text-[var(--text-muted)]'
                 }`}>
-                <div className="markdown-content text-sm leading-relaxed prose prose-invert prose-p:leading-relaxed prose-li:my-1">
+                <div className="markdown-content text-sm leading-relaxed prose prose-p:leading-relaxed prose-li:my-1">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
                     {msg.key ? t(msg.key) : msg.content}
                   </ReactMarkdown>

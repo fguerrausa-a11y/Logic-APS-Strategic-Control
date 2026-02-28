@@ -3,20 +3,7 @@
 @tailwind utilities;
 
 :root {
-  /* Default: Dark Theme */
-  --bg-main: #090e14;
-  --bg-sidebar: #0d121b;
-  --bg-card: #161c27;
-  --bg-input: #0f172a;
-  --border-color: rgba(255, 255, 255, 0.08);
-  --text-main: #f1f5f9;
-  --text-muted: #94a3b8;
-  --accent: #6366f1;
-  --accent-secondary: #f59e0b;
-  --row-hover: rgba(255, 255, 255, 0.03);
-}
-
-[data-theme='light'] {
+  /* Default: Light Theme */
   --bg-main: #f8fafc;
   --bg-sidebar: #ffffff;
   --bg-card: #ffffff;
@@ -27,6 +14,19 @@
   --accent: #4f46e5;
   --accent-secondary: #d97706;
   --row-hover: rgba(0, 0, 0, 0.02);
+}
+
+[data-theme='dark'] {
+  --bg-main: #090e14;
+  --bg-sidebar: #0d121b;
+  --bg-card: #161c27;
+  --bg-input: #0f172a;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --accent: #6366f1;
+  --accent-secondary: #f59e0b;
+  --row-hover: rgba(255, 255, 255, 0.03);
 }
 
 html {

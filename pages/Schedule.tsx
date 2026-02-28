@@ -220,6 +220,22 @@ const SchedulePage: React.FC = () => {
     }
   }, [selectedScenarioId]);
 
+  useEffect(() => {
+    if (operations.length > 0) {
+      const times = operations.map(o => new Date(o.start_date).getTime());
+      const endTimes = operations.map(o => new Date(o.end_date).getTime());
+      const minT = Math.min(...times);
+      const maxT = Math.max(...endTimes);
+      const start = new Date(minT);
+      start.setHours(0, 0, 0, 0);
+      const days = Math.max(30, Math.ceil((maxT - start.getTime()) / (1000 * 60 * 60 * 24)) + 14); // 14 days padding
+      setViewRange({ start, days });
+    } else {
+      setViewRange({ start: new Date(), days: 90 });
+    }
+  }, [operations]);
+
+
   const loadScenarioOperations = async (id: string | null) => {
     if (!id) return;
     setLoading(true);

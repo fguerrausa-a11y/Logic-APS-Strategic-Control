@@ -1,8 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from '../services/languageService';
 import { supabase } from '../services/supabaseClient';
 import TopHeader from '../components/TopHeader';
+import PlantLayoutAnimated from '../components/PlantLayoutAnimated';
 import { erpMigrationService } from '../services/erpMigrationService';
 import {
     Database,
@@ -21,9 +22,427 @@ import {
     AlertCircle,
     Plus,
     Minus,
+    Trash2,
+    Edit2,
+    Shuffle,
     CheckCircle2,
-    TrendingDown
+    TrendingDown,
+    X,
+    CheckCircle,
+    XCircle,
+    Info,
+    AlertTriangle,
+    Factory,
+    ShoppingBag,
+    Layers
 } from 'lucide-react';
+
+// ─── Toast Notification System ──────────────────────────────────────────────
+type ToastType = 'success' | 'error' | 'info' | 'warning';
+interface Toast { id: number; type: ToastType; title: string; message?: string; }
+
+const toastStyles: Record<ToastType, string> = {
+    success: 'border-emerald-500/40 bg-emerald-500/10',
+    error: 'border-rose-500/40 bg-rose-500/10',
+    info: 'border-indigo-500/40 bg-indigo-500/10',
+    warning: 'border-amber-500/40 bg-amber-500/10',
+};
+const toastIconColor: Record<ToastType, string> = {
+    success: 'text-emerald-400',
+    error: 'text-rose-400',
+    info: 'text-indigo-400',
+    warning: 'text-amber-400',
+};
+const ToastIcon: React.FC<{ type: ToastType }> = ({ type }) => {
+    if (type === 'success') return <CheckCircle size={18} />;
+    if (type === 'error') return <XCircle size={18} />;
+    if (type === 'warning') return <AlertTriangle size={18} />;
+    return <Info size={18} />;
+};
+
+const ToastContainer: React.FC<{ toasts: Toast[]; onRemove: (id: number) => void }> = ({ toasts, onRemove }) => (
+    <div className="fixed bottom-6 right-6 z-[200] flex flex-col gap-3 pointer-events-none">
+        {toasts.map(toast => (
+            <div
+                key={toast.id}
+                className={`pointer-events-auto flex items-start gap-3 px-5 py-4 rounded-2xl border backdrop-blur-md shadow-2xl min-w-[300px] max-w-[380px] animate-in slide-in-from-right-5 fade-in duration-300 ${toastStyles[toast.type]}`}
+            >
+                <div className={`mt-0.5 shrink-0 ${toastIconColor[toast.type]}`}><ToastIcon type={toast.type} /></div>
+                <div className="flex-1 min-w-0">
+                    <p className="text-[11px] font-black uppercase tracking-widest text-[var(--text-main)]">{toast.title}</p>
+                    {toast.message && <p className="text-[11px] text-[var(--text-muted)] mt-0.5 leading-relaxed break-words">{toast.message}</p>}
+                </div>
+                <button onClick={() => onRemove(toast.id)} className="shrink-0 text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors"><X size={14} /></button>
+            </div>
+        ))}
+    </div>
+);
+
+// ─── Confirm Dialog ──────────────────────────────────────────────────────────
+interface ConfirmDialogProps {
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    onCancel: () => void;
+    confirmLabel?: string;
+    danger?: boolean;
+}
+const ConfirmDialog: React.FC<ConfirmDialogProps> = ({ isOpen, title, message, onConfirm, onCancel, confirmLabel = 'Confirmar', danger = false }) => {
+    if (!isOpen) return null;
+    return (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onCancel}>
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                <div className="p-6 border-b border-[var(--border-color)] flex items-center gap-4">
+                    <div className={`p-3 rounded-2xl ${danger ? 'bg-rose-500/10 text-rose-400' : 'bg-indigo-500/10 text-indigo-400'}`}>
+                        {danger ? <Trash2 size={22} /> : <AlertTriangle size={22} />}
+                    </div>
+                    <div>
+                        <h3 className="text-base font-black text-[var(--text-main)] uppercase tracking-tight">{title}</h3>
+                        <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{message}</p>
+                    </div>
+                </div>
+                <div className="p-6 flex justify-end gap-3">
+                    <button onClick={onCancel} className="px-5 py-2.5 rounded-xl border border-[var(--border-color)] text-xs font-black uppercase tracking-widest text-[var(--text-muted)] hover:bg-[var(--bg-main)] transition-all">
+                        Cancelar
+                    </button>
+                    <button onClick={onConfirm} className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest text-white transition-all active:scale-95 ${danger ? 'bg-rose-600 hover:bg-rose-500' : 'bg-indigo-600 hover:bg-indigo-500'}`}>
+                        {confirmLabel}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ─── Create Item Modal ───────────────────────────────────────────────────────
+interface CreateItemModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    availableItems: any[];
+    onSave: (item: any, components: { item_id: string; qty: number }[]) => Promise<void>;
+}
+const CreateItemModal: React.FC<CreateItemModalProps> = ({ isOpen, onClose, availableItems, onSave }) => {
+    const { t } = useTranslation();
+    const [form, setForm] = useState({
+        id: '', name: '', item_type: 'COMPRADO', uom: 'UN',
+        description: '', lead_time_days: 7, min_purchase_qty: 1,
+        initial_stock: 0, current_stock: 0, safety_stock: 0, unit_cost: 0,
+    });
+    const [components, setComponents] = useState<{ item_id: string; name: string; uom: string; qty: number }[]>([]);
+    const [saving, setSaving] = useState(false);
+    const [pickerOpen, setPickerOpen] = useState(false);
+    const [pickerSearch, setPickerSearch] = useState('');
+    const [selectedInPicker, setSelectedInPicker] = useState<Set<string>>(new Set());
+
+    useEffect(() => {
+        if (isOpen) {
+            const newId = `MAN-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+            setForm({ id: newId, name: '', item_type: 'COMPRADO', uom: 'UN', description: '', lead_time_days: 7, min_purchase_qty: 1, initial_stock: 0, current_stock: 0, safety_stock: 0, unit_cost: 0 });
+            setComponents([]);
+            setPickerSearch('');
+            setSelectedInPicker(new Set());
+        }
+    }, [isOpen]);
+
+    if (!isOpen) return null;
+
+    const filteredPicker = availableItems.filter(i =>
+        !components.some(c => c.item_id === i.id) &&
+        (i.name?.toLowerCase().includes(pickerSearch.toLowerCase()) || i.id?.toLowerCase().includes(pickerSearch.toLowerCase()))
+    );
+
+    const addComponent = (item: any) => {
+        setComponents(prev => [...prev, { item_id: item.id, name: item.name, uom: item.uom || 'UN', qty: 1 }]);
+    };
+    const removeComponent = (item_id: string) => {
+        setComponents(prev => prev.filter(c => c.item_id !== item_id));
+    };
+    const updateQty = (item_id: string, qty: number) => {
+        setComponents(prev => prev.map(c => c.item_id === item_id ? { ...c, qty } : c));
+    };
+    const togglePickerItem = (itemId: string) => {
+        setSelectedInPicker(prev => {
+            const next = new Set(prev);
+            if (next.has(itemId)) next.delete(itemId);
+            else next.add(itemId);
+            return next;
+        });
+    };
+    const addSelectedComponents = () => {
+        const toAdd = availableItems.filter(i => selectedInPicker.has(i.id) && !components.some(c => c.item_id === i.id));
+        setComponents(prev => [
+            ...prev,
+            ...toAdd.map(item => ({ item_id: item.id, name: item.name, uom: item.uom || 'UN', qty: 1 }))
+        ]);
+        setSelectedInPicker(new Set());
+        setPickerOpen(false);
+        setPickerSearch('');
+    };
+
+    const handleSubmit = async () => {
+        if (!form.name.trim()) return;
+        setSaving(true);
+        try {
+            await onSave(form, components.map(c => ({ item_id: c.item_id, qty: c.qty })));
+            onClose();
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const inputClass = "w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-main)] outline-none focus:border-indigo-500 transition-all placeholder:text-[var(--text-muted)]/40";
+    const labelClass = "text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest mb-1.5 block";
+
+    return (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-[2.5rem] w-full max-w-3xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+
+                {/* Header */}
+                <div className="p-7 border-b border-[var(--border-color)] flex justify-between items-center bg-[var(--bg-sidebar)] shrink-0">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 text-emerald-400">
+                            <Package size={24} />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-black uppercase tracking-tight text-[var(--text-main)]">Nuevo Artículo</h3>
+                            <p className="text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-widest">Configuración completa del maestro</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-main)] transition-all"><X size={20} /></button>
+                </div>
+
+                {/* Body */}
+                <div className="overflow-y-auto custom-scrollbar flex-1 p-7 space-y-8">
+
+                    {/* Identidad */}
+                    <div>
+                        <h4 className="text-[10px] font-black text-emerald-400 uppercase tracking-widest border-b border-[var(--border-color)] pb-2 mb-4 flex items-center gap-2"><FileText size={12} /> Identificación</h4>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="col-span-2">
+                                <label className={labelClass}>Nombre del Artículo *</label>
+                                <input className={inputClass} placeholder="Ej: Tapa Lateral Izquierda" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+                            </div>
+                            <div>
+                                <label className={labelClass}>Código / ID</label>
+                                <input className={inputClass} value={form.id} onChange={e => setForm(f => ({ ...f, id: e.target.value }))} />
+                            </div>
+                            <div>
+                                <label className={labelClass}>Unidad de Medida</label>
+                                <select className={inputClass} value={form.uom} onChange={e => setForm(f => ({ ...f, uom: e.target.value }))}>
+                                    {['UN', 'KG', 'M', 'M2', 'M3', 'LT', 'HS', 'PACK', 'JUEGO'].map(u => <option key={u} value={u}>{u}</option>)}
+                                </select>
+                            </div>
+                            <div className="col-span-2">
+                                <label className={labelClass}>Descripción</label>
+                                <input className={inputClass} placeholder="Descripción técnica opcional..." value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Tipo de Artículo */}
+                    <div>
+                        <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest border-b border-[var(--border-color)] pb-2 mb-4 flex items-center gap-2"><Layers size={12} /> Tipo de Artículo</h4>
+                        <div className="grid grid-cols-2 gap-4">
+                            {[
+                                {
+                                    val: 'COMPRADO',
+                                    icon: ShoppingBag,
+                                    label: 'Comprado',
+                                    desc: 'Se adquiere a un proveedor. El motor genera una Orden de Compra cuando hay demanda.',
+                                    color: 'amber',
+                                    detail: 'No tiene fórmula de componentes (BOM).'
+                                },
+                                {
+                                    val: 'FABRICADO',
+                                    icon: Factory,
+                                    label: 'Fabricado',
+                                    desc: 'Se produce internamente. El motor genera una Orden de Trabajo cuando hay demanda.',
+                                    color: 'emerald',
+                                    detail: 'Requiere definir su fórmula de componentes (BOM) a continuación.'
+                                },
+                            ].map(opt => (
+                                <button
+                                    key={opt.val}
+                                    onClick={() => setForm(f => ({ ...f, item_type: opt.val }))}
+                                    className={`p-5 rounded-2xl border text-left transition-all ${form.item_type === opt.val
+                                        ? `border-${opt.color}-500/50 bg-${opt.color}-500/10 shadow-lg`
+                                        : 'border-[var(--border-color)] hover:border-[var(--border-color)]/80 hover:bg-[var(--bg-main)]/40'
+                                        }`}
+                                >
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <div className={`p-2 rounded-xl ${form.item_type === opt.val ? `bg-${opt.color}-500/20` : 'bg-[var(--bg-main)]'}`}>
+                                            <opt.icon size={18} className={form.item_type === opt.val ? `text-${opt.color}-400` : 'text-[var(--text-muted)]'} />
+                                        </div>
+                                        <p className={`text-sm font-black ${form.item_type === opt.val ? `text-${opt.color}-400` : 'text-[var(--text-main)]'}`}>{opt.label}</p>
+                                    </div>
+                                    <p className="text-[10px] text-[var(--text-muted)] leading-relaxed">{opt.desc}</p>
+                                    <p className={`text-[9px] font-bold mt-2 ${form.item_type === opt.val ? `text-${opt.color}-400/70` : 'text-[var(--text-muted)]/50'}`}>{opt.detail}</p>
+                                </button>
+                            ))}
+                        </div>
+                        {/* Nota aclaratoria */}
+                        <p className="text-[9px] text-[var(--text-muted)] mt-3 pl-1 leading-relaxed">
+                            💡 La posición del artículo en la jerarquía (si es componente de otro fabricado) la determina el BOM, no este campo.
+                        </p>
+                    </div>
+
+                    {/* Parámetros de Planificación */}
+                    <div>
+                        <h4 className="text-[10px] font-black text-purple-400 uppercase tracking-widest border-b border-[var(--border-color)] pb-2 mb-4 flex items-center gap-2"><Settings size={12} /> Parámetros de Planificación</h4>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className={labelClass}>Lead Time (días)</label>
+                                <input type="number" className={inputClass} value={form.lead_time_days} onChange={e => setForm(f => ({ ...f, lead_time_days: Number(e.target.value) }))} />
+                            </div>
+                            <div>
+                                <label className={labelClass}>Lote Mínimo de Compra / Producción</label>
+                                <input type="number" className={inputClass} value={form.min_purchase_qty} onChange={e => setForm(f => ({ ...f, min_purchase_qty: Number(e.target.value) }))} />
+                            </div>
+                            <div>
+                                <label className={labelClass}>Stock Actual (unidades en inventario hoy)</label>
+                                <input type="number" className={inputClass} value={form.current_stock} onChange={e => setForm(f => ({ ...f, current_stock: Number(e.target.value), initial_stock: Number(e.target.value) }))} />
+                            </div>
+                            <div>
+                                <label className={labelClass}>Stock de Seguridad (mínimo a mantener)</label>
+                                <input type="number" className={inputClass} value={form.safety_stock} onChange={e => setForm(f => ({ ...f, safety_stock: Number(e.target.value) }))} />
+                            </div>
+                            <div className="col-span-2">
+                                <label className={labelClass}>Costo Unitario ($)</label>
+                                <input type="number" step="0.01" className={inputClass} value={form.unit_cost} onChange={e => setForm(f => ({ ...f, unit_cost: Number(e.target.value) }))} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Componentes (solo si es FABRICADO o SEMIELABORADO) */}
+                    {(form.item_type === 'FABRICADO' || form.item_type === 'SEMIELABORADO') && (
+                        <div>
+                            <h4 className="text-[10px] font-black text-rose-400 uppercase tracking-widest border-b border-[var(--border-color)] pb-2 mb-4 flex items-center gap-2"><GitBranch size={12} /> Componentes de la Fórmula (BOM)</h4>
+
+                            {/* Componentes agregados */}
+                            {components.length > 0 && (
+                                <div className="space-y-2 mb-4">
+                                    {components.map(c => (
+                                        <div key={c.item_id} className="flex items-center gap-3 bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5">
+                                            <Package size={14} className="text-indigo-400 shrink-0" />
+                                            <span className="text-sm font-bold text-[var(--text-main)] flex-1 truncate">{c.name}</span>
+                                            <span className="text-[9px] text-[var(--text-muted)] uppercase tracking-widest shrink-0">Cantidad:</span>
+                                            <input
+                                                type="number" min="0.01" step="0.01"
+                                                value={c.qty}
+                                                onChange={e => updateQty(c.item_id, Number(e.target.value))}
+                                                className="w-20 bg-[var(--bg-card)] border border-indigo-500/30 rounded-lg px-2 py-1 text-sm font-black text-indigo-400 text-center outline-none focus:border-indigo-500"
+                                            />
+                                            <span className="text-[10px] font-black text-indigo-300 shrink-0 min-w-[28px]">{c.uom}</span>
+                                            <button onClick={() => removeComponent(c.item_id)} className="text-rose-400 hover:text-rose-300 transition-colors shrink-0"><X size={16} /></button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Selector de componentes con multi-select */}
+                            <div className="border border-dashed border-[var(--border-color)] rounded-2xl overflow-hidden">
+                                <button
+                                    onClick={() => { setPickerOpen(!pickerOpen); if (pickerOpen) { setSelectedInPicker(new Set()); setPickerSearch(''); } }}
+                                    className="w-full flex items-center justify-between px-5 py-3.5 text-[11px] font-black uppercase tracking-widest text-indigo-400 hover:bg-indigo-500/5 transition-all"
+                                >
+                                    <span className="flex items-center gap-2"><Plus size={14} /> Agregar componentes</span>
+                                    <ChevronDown size={14} className={`transition-transform ${pickerOpen ? 'rotate-180' : ''}`} />
+                                </button>
+                                {pickerOpen && (
+                                    <div className="border-t border-[var(--border-color)] p-4 space-y-3">
+                                        <div className="relative">
+                                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+                                            <input
+                                                className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl py-2 pl-9 pr-4 text-sm outline-none focus:border-indigo-500"
+                                                placeholder="Buscar artículo por nombre o código..."
+                                                value={pickerSearch}
+                                                onChange={e => setPickerSearch(e.target.value)}
+                                                autoFocus
+                                            />
+                                        </div>
+                                        <div className="max-h-52 overflow-y-auto custom-scrollbar space-y-1">
+                                            {filteredPicker.length === 0 && (
+                                                <p className="text-center text-[var(--text-muted)] text-xs py-4 italic">No hay artículos disponibles</p>
+                                            )}
+                                            {filteredPicker.map(item => {
+                                                const isChecked = selectedInPicker.has(item.id);
+                                                return (
+                                                    <label
+                                                        key={item.id}
+                                                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all cursor-pointer select-none ${isChecked ? 'bg-indigo-500/15 border border-indigo-500/30' : 'hover:bg-[var(--bg-main)] border border-transparent'
+                                                            }`}
+                                                    >
+                                                        {/* Checkbox */}
+                                                        <div
+                                                            onClick={() => togglePickerItem(item.id)}
+                                                            className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${isChecked ? 'bg-indigo-500 border-indigo-500' : 'border-[var(--border-color)] hover:border-indigo-400'
+                                                                }`}
+                                                        >
+                                                            {isChecked && <CheckCircle2 size={12} className="text-white" />}
+                                                        </div>
+                                                        {/* Icono tipo */}
+                                                        <div className={`p-1.5 rounded-lg shrink-0 ${item.item_type === 'COMPRADO' ? 'bg-amber-500/10 text-amber-400' :
+                                                            item.item_type === 'SEMIELABORADO' ? 'bg-indigo-500/10 text-indigo-400' :
+                                                                'bg-emerald-500/10 text-emerald-400'
+                                                            }`} onClick={() => togglePickerItem(item.id)}>
+                                                            <Package size={12} />
+                                                        </div>
+                                                        {/* Info */}
+                                                        <div className="flex-1 min-w-0" onClick={() => togglePickerItem(item.id)}>
+                                                            <p className={`text-xs font-bold truncate ${isChecked ? 'text-indigo-300' : 'text-[var(--text-main)]'}`}>{item.name}</p>
+                                                            <p className="text-[9px] text-[var(--text-muted)] font-mono">{item.id} · <span className="text-indigo-400 font-bold">{item.uom}</span></p>
+                                                        </div>
+                                                        {/* Badge tipo */}
+                                                        <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md shrink-0 ${item.item_type === 'COMPRADO' ? 'bg-amber-500/10 text-amber-400' :
+                                                            item.item_type === 'SEMIELABORADO' ? 'bg-indigo-500/10 text-indigo-400' :
+                                                                'bg-emerald-500/10 text-emerald-400'
+                                                            }`}>{item.item_type}</span>
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
+                                        {/* Barra de acción multi-select */}
+                                        <div className="flex items-center justify-between pt-2 border-t border-[var(--border-color)]">
+                                            <span className="text-[10px] text-[var(--text-muted)]">
+                                                {selectedInPicker.size > 0 ? `${selectedInPicker.size} artículo${selectedInPicker.size > 1 ? 's' : ''} seleccionado${selectedInPicker.size > 1 ? 's' : ''}` : 'Ningún artículo seleccionado'}
+                                            </span>
+                                            <button
+                                                onClick={addSelectedComponents}
+                                                disabled={selectedInPicker.size === 0}
+                                                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed text-white text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
+                                            >
+                                                <Plus size={12} />
+                                                Agregar {selectedInPicker.size > 0 ? selectedInPicker.size : ''} seleccionado{selectedInPicker.size !== 1 ? 's' : ''}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div className="p-7 bg-[var(--bg-sidebar)] border-t border-[var(--border-color)] flex justify-between items-center shrink-0">
+                    <p className="text-[10px] text-[var(--text-muted)]">Los campos marcados con * son obligatorios</p>
+                    <div className="flex gap-3">
+                        <button onClick={onClose} className="px-5 py-2.5 rounded-xl border border-[var(--border-color)] text-xs font-black uppercase tracking-widest text-[var(--text-muted)] hover:bg-[var(--bg-main)] transition-all">Cancelar</button>
+                        <button
+                            onClick={handleSubmit}
+                            disabled={saving || !form.name.trim()}
+                            className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg flex items-center gap-2 transition-all active:scale-95"
+                        >
+                            {saving ? <RefreshCw className="animate-spin" size={14} /> : <CheckCircle2 size={14} />}
+                            {saving ? 'Guardando...' : 'Crear Artículo'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 // --- Modals for Drill Down ---
 
@@ -45,7 +464,7 @@ const ArticleMasterModal: React.FC<{ isOpen: boolean; onClose: () => void; artic
             if (error) throw error;
             if (onSave) onSave();
             onClose();
-        } catch (e) { console.error(e); alert(t('error_saving')); }
+        } catch (e) { console.error(e); }
         finally { setSaving(false); }
     };
 
@@ -121,6 +540,7 @@ const MachineMasterModal: React.FC<{ isOpen: boolean; onClose: () => void; machi
     const [shiftId, setShiftId] = useState(machine?.shift_id || '');
     const [ignoreShifts, setIgnoreShifts] = useState(machine?.ignore_shifts || false);
     const [efficiency, setEfficiency] = useState(machine?.efficiency_factor || 1.0);
+    const [isActive, setIsActive] = useState(machine?.is_active !== false); // undefined = active
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
@@ -128,6 +548,7 @@ const MachineMasterModal: React.FC<{ isOpen: boolean; onClose: () => void; machi
             setShiftId(machine.shift_id || '');
             setIgnoreShifts(machine.ignore_shifts || false);
             setEfficiency(machine.efficiency_factor || 1.0);
+            setIsActive(machine.is_active !== false);
         }
     }, [machine]);
 
@@ -139,12 +560,13 @@ const MachineMasterModal: React.FC<{ isOpen: boolean; onClose: () => void; machi
             const { error } = await supabase.from('machines').update({
                 shift_id: shiftId || null,
                 ignore_shifts: ignoreShifts,
-                efficiency_factor: efficiency
+                efficiency_factor: efficiency,
+                is_active: isActive
             }).eq('id', machine.id);
             if (error) throw error;
             if (onSave) onSave();
             onClose();
-        } catch (e) { console.error(e); alert(t('error_saving')); }
+        } catch (e) { console.error(e); }
         finally { setSaving(false); }
     };
 
@@ -189,6 +611,16 @@ const MachineMasterModal: React.FC<{ isOpen: boolean; onClose: () => void; machi
                                     <div>
                                         <p className="text-[10px] font-black text-[var(--text-main)] uppercase tracking-tight">{t('free_from_shifts')}</p>
                                         <p className="text-[8px] text-[var(--text-muted)] font-medium">{t('continuous_plan_desc')}</p>
+                                    </div>
+                                </div>
+                                {/* is_active toggle */}
+                                <div className="flex items-center gap-3 p-4 bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl group cursor-pointer" onClick={() => setIsActive(!isActive)}>
+                                    <div className={`w-10 h-5 rounded-full transition-colors relative ${isActive ? 'bg-emerald-500' : 'bg-rose-600'}`}>
+                                        <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${isActive ? 'left-6' : 'left-1'}`} />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-black text-[var(--text-main)] uppercase tracking-tight">Equipo Activo</p>
+                                        <p className="text-[8px] text-[var(--text-muted)] font-medium">{isActive ? 'Disponible para planificación APS' : 'Excluido del scheduling (inactivo)'}</p>
                                     </div>
                                 </div>
                             </div>
@@ -238,7 +670,7 @@ const MachineMasterModal: React.FC<{ isOpen: boolean; onClose: () => void; machi
 };
 
 // --- Sub-Tabla para BOM ---
-const BOMSubTable: React.FC<{ parentId: string, bom: any[], onItemClick: (id: string) => void }> = ({ parentId, bom, onItemClick }) => {
+const BOMSubTable: React.FC<{ parentId: string, bom: any[], items: any[], onItemClick: (id: string) => void }> = ({ parentId, bom, items, onItemClick }) => {
     const { t } = useTranslation();
     const children = bom.filter(b => b.parent_item_id === parentId);
     return (
@@ -252,15 +684,18 @@ const BOMSubTable: React.FC<{ parentId: string, bom: any[], onItemClick: (id: st
                     </tr>
                 </thead>
                 <tbody>
-                    {children.map((c, i) => (
-                        <tr key={i} className="border-b border-[var(--border-color)] hover:bg-[var(--accent)]/5 transition-colors cursor-pointer" onClick={() => onItemClick(c.component_item_id)}>
-                            <td className="px-4 py-2 text-[var(--text-main)] font-medium flex items-center gap-2">
-                                <Package size={12} className="text-indigo-500" />
-                                <span className="underline decoration-[var(--border-color)] underline-offset-4 group-hover:decoration-indigo-500">{c.component_item?.name || c.component_item_id}</span>
-                            </td>
-                            <td className="px-4 py-2 text-right text-indigo-400 font-bold">{c.quantity_required}</td>
-                        </tr>
-                    ))}
+                    {children.map((c, i) => {
+                        const item = items.find(it => it.id === c.component_item_id);
+                        return (
+                            <tr key={i} className="border-b border-[var(--border-color)] hover:bg-[var(--accent)]/5 transition-colors cursor-pointer" onClick={() => onItemClick(c.component_item_id)}>
+                                <td className="px-4 py-2 text-[var(--text-main)] font-medium flex items-center gap-2">
+                                    <Package size={12} className="text-indigo-500" />
+                                    <span className="underline decoration-[var(--border-color)] underline-offset-4 group-hover:decoration-indigo-500">{item?.name || c.component_item_id}</span>
+                                </td>
+                                <td className="px-4 py-2 text-right text-indigo-400 font-bold">{c.quantity_required}</td>
+                            </tr>
+                        );
+                    })}
                     {children.length === 0 && <tr><td colSpan={2} className="px-4 py-4 text-center text-[var(--text-muted)] italic">{t('no_components')}</td></tr>}
                 </tbody>
             </table>
@@ -305,12 +740,22 @@ const WhereUsedSubTable: React.FC<{ itemId: string, bom: any[], items: any[], on
 };
 
 // --- Sub-Tabla para Máquinas ---
-const MachineSubTable: React.FC<{ wcId: string, machines: any[], onMachineClick: (m: any) => void }> = ({ wcId, machines, onMachineClick }) => {
+const MachineSubTable: React.FC<{ wcId: string, machines: any[], onMachineClick: (m: any) => void, onAddMachine?: (wcId: string) => void }> = ({ wcId, machines, onMachineClick, onAddMachine }) => {
     const { t } = useTranslation();
     const wcMachines = machines.filter(m => m.work_center_id === wcId);
     return (
         <div className="bg-[var(--bg-sidebar)] p-4 border-l-4 border-emerald-500/50 m-2 rounded-r-xl">
-            <h5 className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-3">{t('integrated_machinery')}</h5>
+            <div className="flex items-center justify-between mb-3">
+                <h5 className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">{t('integrated_machinery')}</h5>
+                {onAddMachine && (
+                    <button
+                        onClick={() => onAddMachine(wcId)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-black uppercase tracking-widest hover:bg-emerald-500/20 transition-all"
+                    >
+                        <Plus size={10} /> Máquina
+                    </button>
+                )}
+            </div>
             <table className="w-full text-xs">
                 <thead>
                     <tr className="text-[var(--text-muted)] border-b border-[var(--border-color)]">
@@ -332,7 +777,9 @@ const MachineSubTable: React.FC<{ wcId: string, machines: any[], onMachineClick:
                                 {(m.efficiency_factor || 1.0).toFixed(2)}
                             </td>
                             <td className="px-4 py-2 text-center">
-                                <span className="bg-emerald-500/10 text-emerald-500 px-2 py-0.5 rounded-md text-[9px] font-black uppercase">{t('active')}</span>
+                                <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase ${m.is_active === false ? 'bg-rose-500/10 text-rose-400' : 'bg-emerald-500/10 text-emerald-500'}`}>
+                                    {m.is_active === false ? 'Inactivo' : t('active')}
+                                </span>
                             </td>
                         </tr>
                     ))}
@@ -344,13 +791,13 @@ const MachineSubTable: React.FC<{ wcId: string, machines: any[], onMachineClick:
 };
 
 // --- Sub-Tabla para Detalle de Pedido (Explosión) ---
-const OrderDetailsSubTable: React.FC<{ order: any, bom: any[], routings: any[], onItemClick: (id: string) => void }> = ({ order, bom, routings, onItemClick }) => {
+const OrderDetailsSubTable: React.FC<{ order: any, bom: any[], items: any[], routings: any[], onItemClick: (id: string) => void }> = ({ order, bom, items, routings, onItemClick }) => {
     const { t } = useTranslation();
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 m-2">
             <div className="bg-[var(--bg-sidebar)] p-4 border-l-4 border-indigo-500/50 rounded-r-xl">
                 <h5 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-3">{t('material_explosion')}</h5>
-                <BOMSubTable parentId={order.item_id} bom={bom} onItemClick={onItemClick} />
+                <BOMSubTable parentId={order.item_id} bom={bom} items={items} onItemClick={onItemClick} />
             </div>
             <div className="bg-[var(--bg-sidebar)] p-4 border-l-4 border-amber-500/50 rounded-r-xl">
                 <h5 className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-3">{t('product_routing')}</h5>
@@ -536,10 +983,246 @@ const RoutingFlow: React.FC<{ items: any[], routings: any[], workCenters: any[],
     );
 };
 
+// ─── Create / Edit Work Center Modal ─────────────────────────────────────────
+// Handles both NEW work center creation (with machines inline) and
+// adding a single machine to an EXISTING work center.
+type WCModalMode = { type: 'create' } | { type: 'add_machine'; wcId: string; wcName: string };
+
+const CreateWorkCenterModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    mode: WCModalMode;
+    shifts: any[];
+    onSave: () => Promise<void>;
+    onError: (msg: string) => void;
+}> = ({ isOpen, onClose, mode, shifts, onSave, onError }) => {
+    const genId = (prefix: string) => `${prefix}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+
+    const [wcId, setWcId] = useState(() => genId('WC'));
+    const [wcName, setWcName] = useState('');
+    const [machines, setMachines] = useState<any[]>([]);
+    const [saving, setSaving] = useState(false);
+    const [errors, setErrors] = useState<string[]>([]);
+
+    // Reset when modal opens/mode changes
+    useEffect(() => {
+        if (isOpen) {
+            if (mode.type === 'create') {
+                setWcId(genId('WC'));
+                setWcName('');
+                setMachines([]);
+            } else {
+                // add_machine: pre-populate one empty machine row
+                setMachines([{ id: genId('M'), name: '', shift_id: '', efficiency_factor: 1.0, is_active: true, ignore_shifts: false }]);
+            }
+            setErrors([]);
+        }
+    }, [isOpen]);
+
+    const addMachineRow = () => {
+        setMachines(prev => [...prev, { id: genId('M'), name: '', shift_id: '', efficiency_factor: 1.0, is_active: true, ignore_shifts: false }]);
+    };
+
+    const removeMachineRow = (idx: number) => {
+        setMachines(prev => prev.filter((_, i) => i !== idx));
+    };
+
+    const updateMachine = (idx: number, field: string, value: any) => {
+        setMachines(prev => prev.map((m, i) => i === idx ? { ...m, [field]: value } : m));
+    };
+
+    const validate = (): boolean => {
+        const errs: string[] = [];
+        if (mode.type === 'create') {
+            if (!wcId.trim()) errs.push('El ID del centro de trabajo es requerido.');
+            if (!wcName.trim()) errs.push('El nombre del centro de trabajo es requerido.');
+        }
+        machines.forEach((m, i) => {
+            if (!m.name.trim()) errs.push(`Máquina #${i + 1}: el nombre es requerido.`);
+            if (!m.id.trim()) errs.push(`Máquina #${i + 1}: el ID es requerido.`);
+        });
+        setErrors(errs);
+        return errs.length === 0;
+    };
+
+    const handleSave = async () => {
+        if (!validate()) return;
+        setSaving(true);
+        try {
+            if (mode.type === 'create') {
+                const { error: wcErr } = await supabase.from('work_centers').insert([{ id: wcId.trim(), name: wcName.trim() }]);
+                if (wcErr) throw new Error(wcErr.message || wcErr.details);
+            }
+            const targetWcId = mode.type === 'create' ? wcId.trim() : mode.wcId;
+            for (const m of machines) {
+                if (!m.name.trim()) continue;
+                const { error: mErr } = await supabase.from('machines').insert([{
+                    id: m.id.trim(),
+                    name: m.name.trim(),
+                    work_center_id: targetWcId,
+                    shift_id: m.shift_id || null,
+                    efficiency_factor: Number(m.efficiency_factor) || 1.0,
+                    is_active: m.is_active,
+                    ignore_shifts: m.ignore_shifts,
+                }]);
+                if (mErr) throw new Error(`Máquina "${m.name}": ${mErr.message || mErr.details}`);
+            }
+            await onSave();
+            onClose();
+        } catch (e: any) {
+            onError(e.message);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    const isCreate = mode.type === 'create';
+    const title = isCreate ? 'Nuevo Centro de Trabajo' : `Agregar Máquina a ${(mode as any).wcName}`;
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-[2.5rem] w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
+                {/* Header */}
+                <div className="p-8 border-b border-[var(--border-color)] flex justify-between items-center bg-[var(--bg-sidebar)] shrink-0">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-indigo-500/10 rounded-2xl border border-indigo-500/20 text-indigo-400"><Settings size={24} /></div>
+                        <div>
+                            <h3 className="text-xl font-black uppercase tracking-tighter text-[var(--text-main)]">{title}</h3>
+                            <p className="text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-widest mt-0.5">
+                                {isCreate ? 'Complete los datos y agregue los equipos del centro' : 'Ingrese los datos del nuevo equipo'}
+                            </p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors"><Minus size={24} className="rotate-45" /></button>
+                </div>
+
+                {/* Body */}
+                <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
+                    {/* WC fields — only in create mode */}
+                    {isCreate && (
+                        <div className="grid grid-cols-2 gap-6">
+                            <div>
+                                <label className="text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest mb-2 block">ID del Centro *</label>
+                                <input value={wcId} onChange={e => setWcId(e.target.value.toUpperCase())}
+                                    className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-sm font-bold text-indigo-400 outline-none focus:border-indigo-500 font-mono transition-all" />
+                            </div>
+                            <div>
+                                <label className="text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest mb-2 block">Nombre del Centro *</label>
+                                <input value={wcName} onChange={e => setWcName(e.target.value)}
+                                    placeholder="Ej: Línea de Corte 1"
+                                    className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-sm font-bold text-[var(--text-main)] outline-none focus:border-indigo-500 transition-all" />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Machines section */}
+                    <div>
+                        <div className="flex items-center justify-between mb-4">
+                            <h4 className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest flex items-center gap-2">
+                                <Cpu size={12} /> {isCreate ? 'Equipos / Máquinas' : 'Nuevo Equipo'}
+                            </h4>
+                            {isCreate && (
+                                <button onClick={addMachineRow}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-black uppercase tracking-widest hover:bg-emerald-500/20 transition-all">
+                                    <Plus size={10} /> Agregar equipo
+                                </button>
+                            )}
+                        </div>
+
+                        {machines.length === 0 && isCreate && (
+                            <div className="text-center py-8 border border-dashed border-[var(--border-color)] rounded-2xl">
+                                <Cpu size={24} className="mx-auto mb-2 text-[var(--text-muted)]" />
+                                <p className="text-[var(--text-muted)] text-xs">Sin equipos aún. Podes agregar máquinas ahora o después.</p>
+                            </div>
+                        )}
+
+                        <div className="space-y-4">
+                            {machines.map((m, idx) => (
+                                <div key={idx} className="bg-[var(--bg-sidebar)] border border-[var(--border-color)] rounded-2xl p-5 space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Equipo #{idx + 1}</span>
+                                        {machines.length > 1 && isCreate && (
+                                            <button onClick={() => removeMachineRow(idx)} className="p-1.5 text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all"><Minus size={14} /></button>
+                                        )}
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-[8px] font-black text-[var(--text-muted)] uppercase tracking-widest mb-1.5 block">ID Equipo *</label>
+                                            <input value={m.id} onChange={e => updateMachine(idx, 'id', e.target.value.toUpperCase())}
+                                                className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-3 py-2 text-xs font-bold text-indigo-400 outline-none focus:border-indigo-500 font-mono transition-all" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[8px] font-black text-[var(--text-muted)] uppercase tracking-widest mb-1.5 block">Nombre Equipo *</label>
+                                            <input value={m.name} onChange={e => updateMachine(idx, 'name', e.target.value)}
+                                                placeholder="Ej: Prensa Hidráulica #1"
+                                                className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-3 py-2 text-xs font-bold text-[var(--text-main)] outline-none focus:border-indigo-500 transition-all" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[8px] font-black text-[var(--text-muted)] uppercase tracking-widest mb-1.5 block">Turno Asignado</label>
+                                            <select value={m.shift_id} onChange={e => updateMachine(idx, 'shift_id', e.target.value)}
+                                                disabled={m.ignore_shifts}
+                                                className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-3 py-2 text-xs font-bold text-emerald-400 outline-none focus:border-emerald-500 disabled:opacity-30 transition-all">
+                                                <option value="">Sin turno asignado</option>
+                                                {shifts.map(s => <option key={s.id} value={s.id}>{s.name} ({s.start_time}-{s.end_time})</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="text-[8px] font-black text-[var(--text-muted)] uppercase tracking-widest mb-1.5 block">Factor de Eficiencia</label>
+                                            <input type="number" step="0.05" min="0.1" max="2.0" value={m.efficiency_factor}
+                                                onChange={e => updateMachine(idx, 'efficiency_factor', Number(e.target.value))}
+                                                className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-3 py-2 text-xs font-bold text-emerald-400 outline-none focus:border-emerald-500 transition-all" />
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <div className="flex items-center gap-2 bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-3 py-2 cursor-pointer flex-1"
+                                            onClick={() => updateMachine(idx, 'ignore_shifts', !m.ignore_shifts)}>
+                                            <div className={`w-8 h-4 rounded-full transition-colors relative shrink-0 ${m.ignore_shifts ? 'bg-emerald-500' : 'bg-slate-700'}`}>
+                                                <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${m.ignore_shifts ? 'left-4' : 'left-0.5'}`} />
+                                            </div>
+                                            <span className="text-[8px] font-black text-[var(--text-muted)] uppercase">Opera 24/7</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-3 py-2 cursor-pointer flex-1"
+                                            onClick={() => updateMachine(idx, 'is_active', !m.is_active)}>
+                                            <div className={`w-8 h-4 rounded-full transition-colors relative shrink-0 ${m.is_active ? 'bg-emerald-500' : 'bg-rose-600'}`}>
+                                                <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${m.is_active ? 'left-4' : 'left-0.5'}`} />
+                                            </div>
+                                            <span className="text-[8px] font-black text-[var(--text-muted)] uppercase">Activo</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Validation errors */}
+                    {errors.length > 0 && (
+                        <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4 space-y-1">
+                            {errors.map((e, i) => <p key={i} className="text-xs text-rose-400 font-bold flex items-center gap-2"><AlertCircle size={12} />{e}</p>)}
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div className="p-6 bg-[var(--bg-sidebar)] border-t border-[var(--border-color)] flex justify-end gap-3 shrink-0">
+                    <button onClick={onClose} className="px-6 py-3 rounded-xl border border-[var(--border-color)] text-xs font-black uppercase tracking-widest text-[var(--text-muted)] hover:bg-[var(--bg-main)] transition-all">Cancelar</button>
+                    <button onClick={handleSave} disabled={saving}
+                        className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg flex items-center gap-2 transition-all active:scale-95 disabled:opacity-60">
+                        {saving ? <RefreshCw className="animate-spin" size={14} /> : <CheckCircle2 size={14} />}
+                        {saving ? 'Guardando...' : (isCreate ? 'Crear Centro de Trabajo' : 'Agregar Máquina')}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // --- Main Explorer ---
 
 const DataExplorer: React.FC = () => {
     const [viewMode, setViewMode] = useState<'table' | 'visual'>('table');
+    const [routingViewMode, setRoutingViewMode] = useState<'cards' | 'layout'>('cards');
     const [activeTab, setActiveTab] = useState<'inputs' | 'outputs'>('inputs');
     const { t } = useTranslation();
     const [subTab, setSubTab] = useState('items');
@@ -553,6 +1236,32 @@ const DataExplorer: React.FC = () => {
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
     const [erpSyncLoading, setErpSyncLoading] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+
+    // ─ Toast system ───────────────────────────────────────
+    const [toasts, setToasts] = useState<Toast[]>([]);
+    const showToast = useCallback((type: ToastType, title: string, message?: string) => {
+        const id = Date.now();
+        setToasts(prev => [...prev, { id, type, title, message }]);
+        setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 5000);
+    }, []);
+    const removeToast = useCallback((id: number) => setToasts(prev => prev.filter(t => t.id !== id)), []);
+
+    // ─ Confirm dialog ──────────────────────────────────
+    const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; id: string }>({ open: false, id: '' });
+
+    // ─ Create Item Modal ───────────────────────────────
+    const [createItemOpen, setCreateItemOpen] = useState(false);
+
+    // ─ Create / Edit Work Center Modal ────────────────
+    const [wcModalOpen, setWcModalOpen] = useState(false);
+    const [wcModalMode, setWcModalMode] = useState<WCModalMode>({ type: 'create' });
+
+    const handleAddMachineToWC = (wcId: string) => {
+        const wc = allData.workCenters.find(w => w.id === wcId);
+        setWcModalMode({ type: 'add_machine', wcId, wcName: wc?.name || wcId });
+        setWcModalOpen(true);
+    };
 
     const handleERPSync = async () => {
         setErpSyncLoading(true);
@@ -567,7 +1276,7 @@ const DataExplorer: React.FC = () => {
                 .single();
 
             if (!settings?.erp_endpoint) {
-                alert(t('erp_not_configured') || 'ERP not configured in Settings');
+                showToast('warning', 'ERP no configurado', 'Configure el endpoint ERP en Ajustes primero');
                 return;
             }
 
@@ -586,14 +1295,14 @@ const DataExplorer: React.FC = () => {
             });
 
             if (result.success) {
-                alert(result.message);
+                showToast('success', 'Sincronización completada', result.message);
                 await fetchData();
             } else {
-                alert(result.message);
+                showToast('warning', 'Sincronización', result.message);
             }
         } catch (e: any) {
             console.error(e);
-            alert(e.message);
+            showToast('error', 'Error de sincronización', e.message);
         } finally {
             setErpSyncLoading(false);
         }
@@ -606,7 +1315,7 @@ const DataExplorer: React.FC = () => {
             { id: 'erp_ppo', label: t('erp_purchases_tab'), icon: ShoppingCart, table: 'erp_purchase_orders' },
             { id: 'bom', label: t('structure_bom_tab'), icon: GitBranch, table: 'items', pivot: true },
             { id: 'work_centers', label: t('plants_equipment_tab'), icon: Settings, table: 'work_centers' },
-            { id: 'routings', label: t('flows_routings_tab'), icon: 'items' },
+            { id: 'routings', label: t('flows_routings_tab'), icon: Shuffle, table: 'routings' },
             { id: 'shifts', label: t('shifts_tab'), icon: Timer, table: 'shifts' },
             { id: 'maintenance_plans', label: t('maintenance_tab'), icon: AlertCircle, table: 'maintenance_plans' },
         ],
@@ -662,6 +1371,8 @@ const DataExplorer: React.FC = () => {
         if (subTab === 'ppo') tableName = 'proposed_purchase_orders';
         if (subTab === 'erp_ppo') tableName = 'erp_purchase_orders';
         if (subTab === 'optimization') tableName = 'optimization_suggestions';
+        if (subTab === 'routings') tableName = 'routings';
+        if (subTab === 'bom') tableName = 'bom';
 
         try {
             let query = supabase.from(tableName).select('*');
@@ -712,8 +1423,95 @@ const DataExplorer: React.FC = () => {
             await fetchData();
         } catch (e) {
             console.error(e);
-            alert(t('error_saving'));
+            showToast('error', 'Error al actualizar', 'No se pudo cambiar el estado de la OC');
         }
+    };
+
+    const handleDeleteRecord = (id: string) => {
+        setConfirmDialog({ open: true, id });
+    };
+
+    const doDelete = async () => {
+        const id = confirmDialog.id;
+        setConfirmDialog({ open: false, id: '' });
+        try {
+            const tableName = tabs[activeTab].find(t => t.id === subTab)?.table || subTab;
+            const { error } = await supabase.from(tableName).delete().eq('id', id);
+            if (error) throw error;
+            showToast('success', 'Registro eliminado', 'El registro fue borrado correctamente');
+            fetchData();
+        } catch (e: any) {
+            console.error(e);
+            showToast('error', 'Error al eliminar', e.message);
+        }
+    };
+
+    const handleCreateRecord = () => {
+        if (subTab === 'items') {
+            setCreateItemOpen(true);
+        } else if (subTab === 'work_centers') {
+            setWcModalMode({ type: 'create' });
+            setWcModalOpen(true);
+        } else {
+            // Para otras tablas, inserción rápida con defaults
+            handleQuickCreate();
+        }
+    };
+
+    const handleQuickCreate = async () => {
+        setIsSaving(true);
+        try {
+            const activeTabData = tabs[activeTab].find(tab => tab.id === subTab);
+            const tableName = activeTabData?.table || subTab;
+            const newId = `MAN-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+            let payload: any = { id: newId };
+            if (tableName === 'work_centers') { payload.name = 'NUEVO CENTRO PRODUCTIVO'; }
+            else if (tableName === 'machines') { payload.name = 'NUEVA MAQUINA'; payload.work_center_id = allData.workCenters[0]?.id || 'WC-01'; payload.efficiency_factor = 1.0; }
+            else if (tableName === 'routings') { payload.id = undefined; payload.item_id = allData.items[0]?.id; payload.operation_sequence = 10; payload.operation_description = 'OPERACION MANUAL'; payload.work_center_id = allData.workCenters[0]?.id || 'WC-01'; payload.setup_time_minutes = 0; payload.run_time_minutes_per_unit = 1; }
+            else if (tableName === 'shifts') { payload.name = 'NUEVO TURNO'; payload.start_time = '08:00'; payload.end_time = '17:00'; }
+            else if (tableName === 'erp_purchase_orders') { payload.item_id = allData.items[0]?.id; payload.quantity_ordered = 1; payload.expected_delivery_date = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); payload.status = 'Open'; }
+            else if (tableName === 'work_orders') { payload.item_id = allData.items[0]?.id; payload.quantity_ordered = 1; payload.quantity_completed = 0; payload.due_date = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(); payload.status = 'New'; }
+            const { error } = await supabase.from(tableName).insert([payload]);
+            if (error) throw error;
+            showToast('success', 'Registro creado', 'Editá los datos haciendo click en el lápiz');
+            await fetchData();
+            await fetchAll();
+        } catch (e: any) {
+            console.error('Error creating record:', e);
+            showToast('error', 'Error al crear', e.message || e.details || 'Error de validación');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleSaveNewItem = async (form: any, components: { item_id: string; qty: number }[]) => {
+        const payload = {
+            id: form.id,
+            name: form.name,
+            item_type: form.item_type,
+            uom: form.uom,
+            description: form.description || null,
+            lead_time_days: form.lead_time_days ? Number(form.lead_time_days) : null,
+            min_purchase_qty: form.min_purchase_qty ? Number(form.min_purchase_qty) : 1,
+            initial_stock: Number(form.current_stock || 0),   // alias: mismo valor
+            current_stock: Number(form.current_stock || 0),
+            safety_stock: Number(form.safety_stock || 0),
+            unit_cost: Number(form.unit_cost || 0),
+        };
+        const { error: itemErr } = await supabase.from('items').insert([payload]);
+        if (itemErr) {
+            const msg = itemErr.message || itemErr.details || JSON.stringify(itemErr);
+            showToast('error', 'Error al guardar artículo', msg);
+            throw new Error(msg);
+        }
+        if (components.length > 0) {
+            const bomRows = components.map(c => ({ parent_item_id: form.id, component_item_id: c.item_id, quantity_required: c.qty }));
+            const { error: bomErr } = await supabase.from('bom').insert(bomRows);
+            if (bomErr) { showToast('warning', 'Artículo creado, error en BOM', bomErr.message || bomErr.details || 'Error desconocido'); }
+        }
+        showToast('success', 'Artículo creado', `"${form.name}" fue guardado correctamente`);
+        await fetchData();
+        await fetchAll();
     };
 
     const filteredData = data.filter(row =>
@@ -755,8 +1553,12 @@ const DataExplorer: React.FC = () => {
     const handleMainRowClick = (row: any, col: string) => {
         if (subTab === 'items' && col === 'name') {
             handleArticleClick(row.id);
-        } else if (subTab === 'work_centers' && col === 'machines') {
-            // Logic handled in sub-table usually, but if there's a machine column...
+        } else if (subTab === 'work_centers') {
+            // Expand the row to show the machine sub-table so the user can click a machine
+            toggleRow(row.id);
+        } else if (subTab === 'shifts') {
+            // Expand the row to show machines assigned to this shift
+            toggleRow(row.id);
         }
     };
 
@@ -793,14 +1595,16 @@ const DataExplorer: React.FC = () => {
                                     <button onClick={() => { setActiveTab('inputs'); setSubTab('items'); }} className={`px-5 py-2 rounded-xl transition-all text-[10px] font-black uppercase tracking-[0.1em] ${activeTab === 'inputs' ? 'bg-[var(--bg-card)] text-indigo-400 border border-[var(--border-color)] shadow-lg' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}>{t('source')}</button>
                                     <button onClick={() => { setActiveTab('outputs'); setSubTab('pwo'); }} className={`px-5 py-2 rounded-xl transition-all text-[10px] font-black uppercase tracking-[0.1em] ${activeTab === 'outputs' ? 'bg-[var(--bg-card)] text-indigo-400 border border-[var(--border-color)] shadow-lg' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}>{t('results')}</button>
                                 </div>
-                                <button
-                                    onClick={handleERPSync}
-                                    disabled={erpSyncLoading}
-                                    className="flex items-center gap-2 px-5 py-2 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-[10px] font-black uppercase tracking-widest hover:bg-rose-500/20 transition-all disabled:opacity-50"
-                                >
-                                    {erpSyncLoading ? <RefreshCw className="animate-spin" size={14} /> : <RefreshCw size={14} />}
-                                    {erpSyncLoading ? t('sync_in_progress') : t('sync_with_erp')}
-                                </button>
+                                <div className="flex items-center gap-4 shrink-0 justify-end">
+                                    <button
+                                        onClick={handleERPSync}
+                                        disabled={erpSyncLoading}
+                                        className="flex items-center gap-2 px-5 py-2 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500/20 transition-all disabled:opacity-50"
+                                    >
+                                        {erpSyncLoading ? <RefreshCw className="animate-spin" size={14} /> : <Database size={14} />}
+                                        {erpSyncLoading ? t('sync_in_progress') : t('sync_with_erp')}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -831,34 +1635,46 @@ const DataExplorer: React.FC = () => {
                                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={16} />
                                             <input type="text" placeholder={t('quick_search')} className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl py-2 pl-10 pr-4 text-[var(--text-main)] text-sm outline-none focus:border-indigo-500/50 transition-all font-bold" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                                         </div>
+
+                                        {activeTab === 'inputs' && (
+                                            <button
+                                                onClick={handleCreateRecord}
+                                                disabled={isSaving}
+                                                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500/20 transition-all"
+                                            >
+                                                {isSaving ? <RefreshCw size={14} className="animate-spin" /> : <Plus size={14} />}
+                                                {t('create_new')}
+                                            </button>
+                                        )}
                                     </div>
                                     <div className="flex-1 overflow-auto custom-scrollbar">
                                         <table className="w-full text-left border-collapse min-w-max relative">
                                             <thead className="sticky top-0 z-10 bg-[var(--bg-sidebar)]">
                                                 <tr className="border-b border-[var(--border-color)] bg-[var(--bg-sidebar)]">
-                                                    {activeTab !== 'outputs' && <th className="px-6 py-4 text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest w-12 text-center bg-[var(--bg-sidebar)]">+/-</th>}
+                                                    {activeTab !== 'outputs' && subTab !== 'bom' && subTab !== 'routings' && <th className="px-6 py-4 text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest w-12 text-center bg-[var(--bg-sidebar)]">+/-</th>}
                                                     {getColumns().map(col => (
                                                         <th key={col} className="px-6 py-4 text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest bg-[var(--bg-sidebar)]">
                                                             {col === 'is_fixed' ? t('reprogrammable') : (t(col as any) !== col ? t(col as any) : col.replace(/_/g, ' '))}
                                                         </th>
                                                     ))}
+                                                    {activeTab === 'inputs' && <th className="px-6 py-4 text-[10px] font-black text-indigo-400 uppercase tracking-widest bg-[var(--bg-sidebar)] text-right">Acciones</th>}
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-[var(--border-color)]/50">
                                                 {filteredData.map((row, idx) => (
                                                     <React.Fragment key={row.id || idx}>
                                                         <tr className="hover:bg-indigo-500/[0.02] transition-colors group">
-                                                            {activeTab !== 'outputs' && (
+                                                            {activeTab !== 'outputs' && subTab !== 'bom' && subTab !== 'routings' && (
                                                                 <td className="px-6 py-4 text-center cursor-pointer" onClick={() => toggleRow(row.id)}>
                                                                     {expandedRows[row.id] ? <Minus size={14} className="text-red-400 mx-auto" /> : <Plus size={14} className="text-indigo-400 mx-auto group-hover:scale-125 transition-transform" />}
                                                                 </td>
                                                             )}
                                                             {getColumns().map((col, vIdx) => (
                                                                 <td key={vIdx} className="px-6 py-4 text-sm text-[var(--text-muted)] group-hover:text-[var(--text-main)]">
-                                                                    {col === 'name' ? (
+                                                                    {(col === 'name' || col === 'parent_item_id' || col === 'component_item_id' || col === 'item_id') ? (
                                                                         <span
                                                                             className="font-bold text-[var(--text-main)] cursor-pointer hover:text-indigo-400 hover:underline underline-offset-4"
-                                                                            onClick={() => handleArticleClick(row.id)}
+                                                                            onClick={() => handleArticleClick(row[col])}
                                                                         >
                                                                             {row[col]}
                                                                         </span>
@@ -891,19 +1707,42 @@ const DataExplorer: React.FC = () => {
                                                                     ) : String(row[col] ?? '-')}
                                                                 </td>
                                                             ))}
+                                                            {activeTab === 'inputs' && (
+                                                                <td className="px-6 py-4 text-right">
+                                                                    <div className="flex justify-end gap-2">
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); handleMainRowClick(row, subTab === 'items' ? 'name' : 'machines'); }}
+                                                                            className="p-2 text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-all"
+                                                                            title={t('edit_btn')}
+                                                                        >
+                                                                            <Edit2 size={16} />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); handleDeleteRecord(row.id); }}
+                                                                            className="p-2 text-rose-500 hover:bg-rose-500/10 rounded-lg transition-all"
+                                                                            title={t('delete_btn')}
+                                                                        >
+                                                                            <Trash2 size={16} />
+                                                                        </button>
+                                                                    </div>
+                                                                </td>
+                                                            )}
                                                         </tr>
                                                         {expandedRows[row.id] && (
                                                             <tr>
                                                                 <td colSpan={getColumns().length + 1} className="bg-[var(--bg-main)]/80">
                                                                     {(subTab === 'bom' || subTab === 'items') && (
-                                                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                                                            <BOMSubTable parentId={row.id} bom={allData.bom} onItemClick={handleArticleClick} />
+                                                                        <div className={`grid grid-cols-1 ${row.item_type === 'COMPRADO' ? '' : 'lg:grid-cols-2'} gap-4`}>
+                                                                            {row.item_type !== 'COMPRADO' && (
+                                                                                <BOMSubTable parentId={row.id} bom={allData.bom} items={allData.items} onItemClick={handleArticleClick} />
+                                                                            )}
                                                                             <WhereUsedSubTable itemId={row.id} bom={allData.bom} items={allData.items} onItemClick={handleArticleClick} />
                                                                         </div>
                                                                     )}
-                                                                    {subTab === 'work_centers' && <MachineSubTable wcId={row.id} machines={allData.machines} onMachineClick={handleMachineClick} />}
+                                                                    {subTab === 'work_centers' && <MachineSubTable wcId={row.id} machines={allData.machines} onMachineClick={handleMachineClick} onAddMachine={handleAddMachineToWC} />}
                                                                     {subTab === 'routings' && <RoutingSubTable itemId={row.id} routings={allData.routings} />}
-                                                                    {subTab === 'work_orders' && <OrderDetailsSubTable order={row} bom={allData.bom} routings={allData.routings} onItemClick={handleArticleClick} />}
+                                                                    {subTab === 'work_orders' && <OrderDetailsSubTable order={row} bom={allData.bom} items={allData.items} routings={allData.routings} onItemClick={handleArticleClick} />}
+
                                                                     {subTab === 'shifts' && <ShiftDetailsSubTable shiftId={row.id} machines={allData.machines} onMachineClick={handleMachineClick} />}
                                                                     {subTab === 'maintenance_plans' && <MaintenanceDetailsSubTable plan={row} machines={allData.machines} onMachineClick={handleMachineClick} />}
                                                                 </td>
@@ -927,8 +1766,22 @@ const DataExplorer: React.FC = () => {
                                             ))}
                                         </div>
                                     ) : subTab === 'routings' ? (
-                                        <div className="overflow-x-auto custom-scrollbar pb-6">
-                                            <RoutingFlow items={allData.items} routings={allData.routings} workCenters={allData.workCenters} machines={allData.machines} />
+                                        <div className="flex flex-col h-full overflow-hidden">
+                                            <div className="flex bg-[var(--bg-input)] p-1.5 rounded-2xl border border-[var(--border-color)] shadow-inner w-fit mb-4 shrink-0">
+                                                <button onClick={() => setRoutingViewMode('cards')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${routingViewMode === 'cards' ? 'bg-indigo-600 text-white shadow-xl' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}><LayoutGrid size={16} /> Tarjetas</button>
+                                                <button onClick={() => setRoutingViewMode('layout')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${routingViewMode === 'layout' ? 'bg-indigo-600 text-white shadow-xl' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}><Factory size={16} /> Layout Interactivo</button>
+                                            </div>
+                                            <div className="flex-1 overflow-hidden relative">
+                                                {routingViewMode === 'cards' ? (
+                                                    <div className="overflow-x-auto custom-scrollbar pb-6 h-full absolute inset-0">
+                                                        <RoutingFlow items={allData.items} routings={allData.routings} workCenters={allData.workCenters} machines={allData.machines} />
+                                                    </div>
+                                                ) : (
+                                                    <div className="h-full absolute inset-0">
+                                                        <PlantLayoutAnimated items={allData.items} routings={allData.routings} workCenters={allData.workCenters} machines={allData.machines} />
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     ) : subTab === 'work_centers' ? (
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -973,7 +1826,35 @@ const DataExplorer: React.FC = () => {
 
                 <ArticleMasterModal isOpen={!!selectedArticle} onClose={() => setSelectedArticle(null)} article={selectedArticle} onSave={fetchData} />
                 <MachineMasterModal isOpen={!!selectedMachine} onClose={() => setSelectedMachine(null)} machine={selectedMachine} shifts={allData.shifts} onSave={fetchAll} />
+                <CreateWorkCenterModal
+                    isOpen={wcModalOpen}
+                    onClose={() => setWcModalOpen(false)}
+                    mode={wcModalMode}
+                    shifts={allData.shifts}
+                    onSave={async () => { await fetchData(); await fetchAll(); }}
+                    onError={(msg) => showToast('error', 'Error al guardar', msg)}
+                />
             </main>
+
+            {/* Sistema global de notificaciones y diálogos */}
+            <ToastContainer toasts={toasts} onRemove={removeToast} />
+
+            <ConfirmDialog
+                isOpen={confirmDialog.open}
+                title="Eliminar Registro"
+                message="Esta acción es irreversible. ¿Seguro que querés borrar este registro?"
+                confirmLabel="Sí, eliminar"
+                danger={true}
+                onConfirm={doDelete}
+                onCancel={() => setConfirmDialog({ open: false, id: '' })}
+            />
+
+            <CreateItemModal
+                isOpen={createItemOpen}
+                onClose={() => setCreateItemOpen(false)}
+                availableItems={allData.items}
+                onSave={handleSaveNewItem}
+            />
         </div>
     );
 };

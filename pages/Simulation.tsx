@@ -163,7 +163,7 @@ const SimulationPage: React.FC = () => {
   const [loadingProposed, setLoadingProposed] = useState(false);
   const [showOrderPicker, setShowOrderPicker] = useState(false);
   const [simulationProgress, setSimulationProgress] = useState(0);
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('theme') as 'light' | 'dark') || 'dark');
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('theme') as 'light' | 'dark') || 'light');
 
   const [virtualMachines, setVirtualMachines] = useState<Record<string, number>>({});
   const [includeMaintenance, setIncludeMaintenance] = useState(true);
@@ -476,7 +476,7 @@ const SimulationPage: React.FC = () => {
             </section>
           </aside>
 
-          <div className="flex-1 p-4 overflow-y-auto bg-grid-slate-900/[0.02]">
+          <div className="flex-1 p-4 overflow-y-auto bg-grid-indigo-500/[0.02]">
             {activeScenario ? (
               <div className="max-w-full mx-auto space-y-6">
                 <div className="bg-indigo-600/5 rounded-[1.5rem] p-6 border border-indigo-500/10 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl">

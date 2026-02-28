@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual de Configuración y Uso | Logic APS</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --softland-blue: #0066cc;
+            --primary: #2563eb;
+            --text-main: #1a1a1a;
+            --text-muted: #4b5563;
+            --bg-page: #fdfdfd;
+            --border: #d1d5db;
+            --header-bg: #f8fafc;
+            --info-bg: #e0f2fe;
+            --info-icon: #0369a1;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9;
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* HEADER ESTILO PDF SOFTLAND */
+        .pdf-header {
+            background: white;
+            border-bottom: 2px solid var(--text-main);
+            padding: 1rem 2rem;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 1rem;
+            flex-shrink: 0;
+        }
+
+        .header-left-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .header-left-table td {
+            border: 1px solid #ccc;
+            padding: 4px 10px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        .logo-box {
+            font-family: 'Outfit';
+            font-weight: 800;
+            color: var(--softland-blue);
+            font-size: 1.5rem;
+            text-align: right;
+        }
+
+        /* LAYOUT MAIN */
+        .app-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        aside {
+            width: 300px;
+            background: white;
+            border-right: 1px solid var(--border);
+            overflow-y: auto;
+            padding: 2rem 1.5rem;
+        }
+
+        .toc-title {
+            font-family: 'Outfit';
+            font-weight: 800;
+            font-size: 1.2rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.5rem;
+        }
+
+        .toc-item {
+            display: block;
+            padding: 0.5rem;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.9rem;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .toc-item:hover {
+            background: #f1f5f9;
+            color: var(--primary);
+        }
+
+        .toc-item.active {
+            font-weight: 700;
+            color: var(--primary);
+            background: #eff6ff;
+        }
+
+        .toc-subitem {
+            padding-left: 1.5rem;
+            font-size: 0.85rem;
+        }
+
+        main {
+            flex: 1;
+            background: var(--bg-page);
+            overflow-y: auto;
+            padding: 4rem;
+            scroll-behavior: smooth;
+        }
+
+        .page-sheet {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 4rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            min-height: 100%;
+        }
+
+        h1 {
+            font-family: 'Outfit';
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 2rem;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 0.5rem;
+        }
+
+        h2 {
+            font-family: 'Outfit';
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-top: 3rem;
+            margin-bottom: 1.5rem;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        h3 {
+            font-family: 'Outfit';
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+            color: var(--primary);
+        }
+
+        p {
+            line-height: 1.7;
+            margin-bottom: 1.2rem;
+            text-align: justify;
+            color: #374151;
+        }
+
+        /* CALLOUTS (TIPO SOFTLAND) */
+        .info-box {
+            background: var(--info-bg);
+            border-top: 2px solid var(--info-icon);
+            border-bottom: 2px solid var(--info-icon);
+            padding: 1.5rem;
+            margin: 2rem 0;
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+        }
+
+        .info-box span {
+            font-size: 2rem;
+            color: var(--info-icon);
+            font-weight: bold;
+        }
+
+        .info-box p {
+            margin-bottom: 0;
+            font-style: italic;
+            color: #0c4a6e;
+        }
+
+        /* SCREENSHOTS */
+        .figure-container {
+            margin: 3rem 0;
+            text-align: center;
+        }
+
+        .figure-container img {
+            width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .figure-caption {
+            margin-top: 1rem;
+            font-size: 0.85rem;
+            font-style: italic;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        /* FIELD LISTS */
+        .field-list {
+            list-style: none;
+            padding: 0;
+            margin: 2rem 0;
+        }
+
+        .field-item {
+            margin-bottom: 1.5rem;
+            border-left: 4px solid #e5e7eb;
+            padding-left: 1.5rem;
+        }
+
+        .field-name {
+            display: block;
+            font-weight: 800;
+            color: var(--text-main);
+            font-size: 1rem;
+            margin-bottom: 0.3rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .field-desc {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+        }
+
+        /* ACADEMIC BLOCKS */
+        .academic-section {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 4rem 0;
+        }
+
+        .academic-badge {
+            background: #1e293b;
+            color: white;
+            display: inline-block;
+            padding: 2px 10px;
+            font-size: 0.65rem;
+            font-weight: 900;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+
+        footer {
+            background: white;
+            border-top: 1px solid var(--border);
+            padding: 0.5rem 2rem;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        /* Estilos de Tabla */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 2rem 0;
+            background: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #e5e7eb;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 0.9rem;
+        }
+
+        .data-table th {
+            background-color: #f8fafc;
+            font-weight: 700;
+            color: #1e293b;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+        }
+
+        .data-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .data-table strong {
+            color: var(--primary);
+        }
+    </style>
+</head>
+
+<body>
+
+    <header class="pdf-header">
+        <table class="header-left-table">
+            <tr>
+                <td colspan="2" style="font-size: 0.9rem; color: var(--softland-blue);">Control Estratégico de
+                    Manufactura</td>
+                <td rowspan="3" style="width: 200px; padding: 0;">
+                    <div class="logo-box">
+                        <img src="https://softland.com.ar/wp-content/uploads/2021/04/logo-softland.png" alt="Softland"
+                            style="height: 40px; margin: 10px;">
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <td>Configuración y uso</td>
+                <td>Versión: 5.3.0</td>
+            </tr>
+            <tr>
+                <td>Documento: MAESTRO_GUI_Planificacion_Avanzada</td>
+                <td>Vigencia: 25/02/2026</td>
+            </tr>
+        </table>
+    </header>
+
+    <div class="app-container">
+        <aside>
+            <div class="toc-title">Tabla de contenido</div>
+            <a href="#intro" class="toc-item active">1. INTRODUCCIÓN</a>
+            <a href="#academic" class="toc-item toc-subitem">1.1 Fundamentos APS y TOC</a>
+            <a href="#control-panel" class="toc-item">2. PANEL DE CONTROL</a>
+            <a href="#simulation" class="toc-item">3. CONSOLA DE SIMULACIÓN</a>
+            <a href="#load-analysis" class="toc-item">4. ANÁLISIS DE CARGA (TOC)</a>
+            <a href="#gantt" class="toc-item">5. CRONOGRAMA GANTT</a>
+            <a href="#analytics" class="toc-item">6. INTELIGENCIA ANALÍTICA</a>
+            <a href="#calibration" class="toc-item">7. CALIBRACIÓN Y AUDITORÍA</a>
+            <a href="#data-masters" class="toc-item">8. DATOS Y MAESTROS</a>
+            <a href="#settings" class="toc-item">9. CONFIGURACIÓN DEL SISTEMA</a>
+        </aside>
+
+        <main>
+            <div class="page-sheet">
+
+                <section id="intro">
+                    <h1>1. INTRODUCCIÓN</h1>
+                    <p>En este sistema se denomina <strong>Planificación Avanzada (APS)</strong> al proceso de
+                        secuenciación de operaciones de fábrica sobre recursos de capacidad finita. A diferencia de un
+                        MRP tradicional, Logic APS garantiza que el programa resultante sea ejecutable, considerando la
+                        disponibilidad real de máquinas, turnos humanos y materiales en tiempo real.</p>
+                    <p>Este manual explica la configuración de los parámetros críticos de la planta y el uso de las
+                        herramientas de monitorización estratégica, permitiendo al usuario gestionar el flujo de
+                        producción por excepción.</p>
+
+                    <div class="info-box">
+                        <span>i</span>
+                        <p>El objetivo principal de Logic APS es maximizar el <em>Throughput</em> (rendimiento) del
+                            sistema protegiendo siempre la fecha de entrega comprometida con el cliente final.</p>
+                    </div>
+
+                    <div id="academic" class="academic-section">
+                        <div class="academic-badge">FUNDAMENTO CIENTÍFICO</div>
+                        <h3>Diferencia entre APS y MRP II</h3>
+                        <p>El MRP II parte de una premisa de "capacidad infinita", asumiendo que siempre hay recursos
+                            para producir. El APS nace para corregir esto, reconociendo que los recursos son limitados.
+                            Logic APS utiliza algoritmos heurísticos para resolver conflictos de carga, priorizando el
+                            flujo sobre el aprovechamiento local de máquinas no críticas.</p>
+                    </div>
+                </section>
+
+                <hr style="opacity: 0.1; margin: 4rem 0;">
+
+                <section id="control-panel">
+                    <h1>2. PANEL DE CONTROL ESTRATÉGICO</h1>
+                    <p>Se explica en esta sección la pantalla inicial de mando, diseñada bajo el principio de
+                        <strong>Gestión Visual</strong>. El sistema procesa miles de variables para presentar solo los
+                        indicadores de salud más relevantes para la gerencia de planta.
+                    </p>
+
+                    <div class="figure-container">
+                        <img src="assets/dashboard.png" alt="Panel de Control">
+                        <div class="figure-caption">Figura 1. Vista General del Centro de Control Estratégico.</div>
+                    </div>
+
+                    <h2 id="control-fields">2.1 Desglose de Campos e Indicadores</h2>
+                    <p>Al ingresar a este módulo, se visualizan los siguientes contenedores de información:</p>
+
+                    <ul class="field-list">
+                        <li class="field-item">
+                            <span class="field-name">Eficiencia OEE (Overall Equipment Effectiveness)</span>
+                            <div class="field-desc">
+                                Representa el porcentaje de efectividad real de los equipos.
+                                <br><strong>Composición:</strong> Al hacer clic en esta tarjeta, se desglosa en
+                                <em>Disponibilidad</em> (tiempo productivo), <em>Rendimiento</em> (velocidad de
+                                ejecución) y <em>Calidad</em> (índice de rechazo).
+                                <br><strong>Uso:</strong> Un valor inferior al 85% debe interpretarse como una pérdida
+                                de rentabilidad por mala utilización de activos.
+                            </div>
+                        </li>
+
+                        <li class="field-item">
+                            <span class="field-name">Cumplimiento (Nivel de Servicio)</span>
+                            <div class="field-desc">
+                                Indica el porcentaje de <strong>Órdenes de Trabajo</strong> (Mandatos de Producción) que
+                                terminarán exactamente en o antes de la fecha requerida por el cliente.
+                                <br><strong>Acción:</strong> Si este valor es bajo, el planificador debe simular
+                                escenarios de horas extras o agregar máquinas.
+                            </div>
+                        </li>
+
+                        <li class="field-item">
+                            <span class="field-name">Retrasos Activos</span>
+                            <div class="field-desc">
+                                Muestra el conteo de Órdenes cuya finalización proyectada ya ha superado la fecha límite
+                                permitida. El sistema mide esto en unidades de "Órdenes" afectadas.
+                            </div>
+                        </li>
+
+                        <li class="field-item">
+                            <span class="field-name">Costo Operativo Proyectado</span>
+                            <div class="field-desc">
+                                Valorización económica de la carga de trabajo asignada para el periodo de simulación
+                                actual. Permite prever el flujo de caja operativo necesario.
+                            </div>
+                        </li>
+
+                        <li class="field-item">
+                            <span class="field-name">Carga de Red (Network Load)</span>
+                            <div class="field-desc">
+                                Ubicado arriba a la derecha (icono ⚡). Indica el grado de saturación total de la
+                                fábrica.
+                                <br><strong>Tip:</strong> Una carga mayor al 95% indica una planta "rígida" donde
+                                cualquier imprevisto (como que una máquina se rompa) provocará retrasos en cadena.
+                            </div>
+                        </li>
+
+                        <li class="field-item">
+                            <span class="field-name">Rendimiento Histórico</span>
+                            <div class="field-desc">
+                                Gráfico de barras que representa la salida diaria de productos terminados.
+                                <br><strong>Qué observar:</strong> Los valles prolongados indican falta de
+                                sincronización en el suministro de materias primas o cuellos de botella en procesos
+                                tempranos.
+                            </div>
+                        </li>
+
+                        <li class="field-item">
+                            <span class="field-name">Trazabilidad Directa (Logs)</span>
+                            <div class="field-desc">
+                                Registro cronológico de anomalías. Explica el "Por qué" de los problemas.
+                                <br><strong>Severidades:</strong>
+                                <ul>
+                                    <li><strong>Error:</strong> Paro total de flujo o retraso severo.</li>
+                                    <li><strong>Advertencia:</strong> El buffer de tiempo se está agotando.</li>
+                                    <li><strong>Aviso:</strong> Ejecución completada según lo previsto.</li>
+                                </ul>
+                            </div>
+                        </li>
+                    </ul>
+
+                    <div class="info-box">
+                        <span>!</span>
+                        <p>Logic APS aplica el concepto de <strong>Gestión por Excepción</strong>: Si el panel de
+                            Trazabilidad no muestra alertas rojas, el planificador no necesita intervenir, permitiendo
+                            que la planta fluya de forma autónoma.</p>
+                    </div>
+                </section>
+
+                <hr style="opacity: 0.1; margin: 4rem 0;">
+
+                <section id="simulation">
+                    <h1>3. CONSOLA DE SIMULACIÓN</h1>
+                    <p>Este módulo es el "Laboratorio de Pruebas" donde el usuario puede modificar las restricciones
+                        físicas de la planta para observar el impacto en los resultados de entrega sin afectar la
+                        producción real hasta que decida aplicar el escenario. Es una herramienta de análisis de
+                        <strong>Escenarios "What-If"</strong>.
+                    </p>
+
+                    <div class="figure-container">
+                        <img src="assets/simulation.png" alt="Consola de Simulación">
+                        <div class="figure-caption">Figura 2. Interfaz de Ajuste de Restricciones y Capacidades.</div>
+                    </div>
+
+                    <h2 id="sim-fields">3.1 Desglose de Parámetros de Escenario</h2>
+
+                    <ul class="field-list">
+                        <li class="field-item">
+                            <span class="field-name">Estrategia: Considerar Mantenimiento</span>
+                            <div class="field-desc">
+                                Determina si el motor APS debe respetar las paradas por mantenimiento preventivo
+                                cargadas en el sistema. Al estar activo (ON), el sistema restará esas horas de la
+                                capacidad disponible del centro de trabajo, lo que puede empujar las órdenes hacia
+                                adelante en el tiempo.
+                                <br><strong>Uso sugerido:</strong> Desactivar solo en casos de emergencia extrema para
+                                cumplir con una orden de prioridad crítica ("Rush Order").
+                            </div>
+                        </li>
+
+                        <li class="field-item">
+                            <span class="field-name">Estrategia: Habilitar Solapamiento (Overlap)</span>
+                            <div class="field-desc">
+                                Implementa la técnica de <strong>Transferencia de Sub-lotes</strong>. Permite que una
+                                pieza de un lote pase a la operación siguiente sin esperar a que termine el lote
+                                completo en la máquina actual.
+                                <br><strong>Impacto:</strong> Reduce drásticamente el Lead Time (tiempo de entrega)
+                                hasta en un 40%, pero aumenta la carga logística en el taller al requerir movimientos
+                                constantes de materiales.
+                            </div>
+                        </li>
+
+                        <li class="field-item">
+                            <span class="field-name">Ajuste de Capacidad por Centro de Trabajo</span>
+                            <div class="field-desc">
+                                Control numérico que permite aumentar o disminuir la cantidad de recursos (máquinas
+                                o personas) disponibles en un centro específico.
+                                <br><strong>Ejemplo:</strong> Si el centro "Soldadura" tiene carga roja, usted puede
+                                simular instantáneamente el efecto de contratar a un operario adicional o habilitar
+                                una máquina que estaba fuera de servicio.
+                            </div>
+                        </li>
+
+                        <li class="field-item">
+                            <span class="field-name">División de Lote (Split)</span>
+                            <div class="field-desc">
+                                Si se activa, el algoritmo APS tiene permiso para fragmentar una Orden de Trabajo
+                                grande y procesarla en varias máquinas idénticas en paralelo. Esto maximiza la
+                                velocidad de entrega, pero ocupa más recursos simultáneamente.
+                            </div>
+                        </li>
+                    </ul>
+
+                    <div class="academic-section">
+                        <div class="academic-badge">TEORÍA DE RESTRICCIONES (TOC)</div>
+                        <h3>El Rol del Analista IA</h3>
+                        <p>Acompañando a la consola, el <strong>Analista IA</strong> procesa millones de combinaciones
+                            de datos para entregarle una conclusión ejecutable. No se limite a leer las barras rojas;
+                            pregunte a la IA: <em>"¿Por qué se retrasa la orden OC-123?"</em> y obtendrá una respuesta
+                            técnica basada en la ruta del artículo y los cuellos de botella detectados.</p>
+                    </div>
+                </section>
+
+                <hr style="opacity: 0.1; margin: 4rem 0;">
+
+                <section id="load-analysis">
+                    <h1>4. ANÁLISIS DE CARGA (TEORÍA DE RESTRICCIONES)</h1>
+                    <p>Esta vista permite identificar visualmente los <strong>Recursos Cuello de Botella</strong>
+                        (Drum). El
+                        sistema compara la <em>Demanda de Tiempo</em> (horas requeridas por las órdenes) contra la
+                        <em>Capacidad Instalada</em> (horas disponibles según turnos y máquinas).
+                    </p>
+
+                    <div class="figure-container">
+                        <img src="assets/load_analysis.png" alt="Análisis de Carga">
+                        <div class="figure-caption">Figura 3. Mapa de Saturación por Centro de Trabajo.</div>
+                    </div>
+
+                    <h3>4.1 Elementos del Análisis de Carga</h3>
+                    <ul class="field-list">
+                        <li class="field-item">
+                            <span class="field-name">Estatus de Carga por Centro</span>
+                            <div class="field-desc">
+                                Se muestra una barra porcentual para cada Centro de Trabajo.
+                                <br>• <strong>Azul/Verde:</strong> Recurso con capacidad ociosa adecuada.
+                                <br>• <strong>Naranja:</strong> Recurso operando cerca del límite (alerta de zona de
+                                riesgo).
+                                <br>• <strong>Rojo:</strong> Recurso saturado (Cuello de Botella). Toda hora perdida
+                                aquí es una hora de retraso para el cliente final.
+                            </div>
+                        </li>
+                        <li class="field-item">
+                            <span class="field-name">Carga Acumulada (Semanas)</span>
+                            <div class="field-desc">
+                                Representación gráfica de cuándo ocurrirá el pico de trabajo. Útil para decidir si se
+                                deben adelantar órdenes de semanas futuras (zona azul) para nivelar la carga.
+                            </div>
+                        </li>
+                    </ul>
+                </section>
+
+                <ul class="field-list">
+                    <li class="field-item">
+                        <span class="field-name">Barras de Saturación</span>
+                        <div class="field-desc">
+                            Representan el porcentaje de ocupación.
+                            <br><strong>Código de Color:</strong> Azul (Operativo), Rojo (Saturado/Crítico).
+                            <br>Un centro en rojo indica que la demanda supera la capacidad instalada para el rango
+                            de fechas elegido.
+                        </div>
+                    </li>
+
+                    <li class="field-item">
+                        <span class="field-name">Balance de Capacidad</span>
+                        <div class="field-desc">
+                            Muestra la relación numérica (Ej: 560h / 400h). Ayuda a cuantificar cuántas horas de
+                            sobrecosto o subcontratación son necesarias para nivelar la carga.
+                        </div>
+                    </li>
+                </ul>
+                </section>
+
+                <hr style="opacity: 0.1; margin: 4rem 0;">
+
+                <section id="gantt">
+                    <h1>5. CRONOGRAMA GANTT (Línea de Tiempo)</h1>
+                    <p>Representa la ejecución táctica. Es la hoja de ruta que la planta debe seguir. Cada bloque es una
+                        tarea asignada a una máquina específica en un minuto exacto.</p>
+
+                    <div class="figure-container">
+                        <img src="assets/schedule.png" alt="Cronograma Gantt">
+                        <div class="figure-caption">Figura 4. Mapa Detallado de Operaciones y Dependencias.</div>
+                    </div>
+
+                    <ul class="field-list">
+                        <li class="field-item">
+                            <span class="field-name">Barras de Operación</span>
+                            <div class="field-desc">
+                                Coloridas y etiquetadas con la <strong>Orden de Trabajo</strong> y el
+                                <strong>Producto</strong>. Su longitud representa el tiempo que la máquina estará
+                                ocupada procesando.
+                            </div>
+                        </li>
+
+                        <li class="field-item">
+                            <span class="field-name">Flechas de Dependencia (Vínculos)</span>
+                            <div class="field-desc">
+                                Son la columna vertebral de la lógica de fabricación. Indican el camino que sigue el
+                                producto a través de las distintas máquinas. Logic APS impide que una flecha apunte
+                                "atrás en el tiempo", asegurando planes lógicos.
+                            </div>
+                        </li>
+
+                        <li class="field-item">
+                            <span class="field-name">Ajuste Manual (Drag & Drop)</span>
+                            <div class="field-desc">
+                                El usuario puede mover una barra de una máquina a otra para optimizar visualmente.
+                                <br><strong>Lo que ocurre debajo:</strong> Al soltar la barra, el sistema recalcula
+                                instantáneamente todas las tareas conectadas para absorber el cambio sin crear huecos de
+                                inactividad.
+                            </div>
+                        </li>
+
+                        <li class="field-item">
+                            <span class="field-name">Controles de Zoom y Tiempo</span>
+                            <div class="field-desc">
+                                Permiten cambiar la escala de visualización de Minutos a Semanas. Fundamental para
+                                planificación de largo plazo vs supervisión de turno actual.
+                            </div>
+                        </li>
+                    </ul>
+                </section>
+
+                <hr style="opacity: 0.1; margin: 4rem 0;">
+
+                <section id="analytics">
+                    <h1>6. INTELIGENCIA ANALÍTICA</h1>
+                    <p>En este módulo se consolidan las métricas de rendimiento estratégico de la planta. Permite a la
+                        gerencia evaluar si la capacidad instalada es coherente con la demanda comercial. No es una
+                        pantalla operativa, sino de <strong>decisión ejecutiva</strong>.</p>
+
+                    <div class="figure-container">
+                        <img src="assets/analytics.png" alt="Inteligencia Analítica">
+                        <div class="figure-caption">Figura 5. Dashboard de Métricas de Manufactura (OEE, MTTR, MTBF).
+                        </div>
+                    </div>
+
+                    <h3>6.1 Indicadores de Desempeño (KPIs)</h3>
+                    <ul class="field-list">
+                        <li class="field-item">
+                            <span class="field-name">OEE Promedio (Efectividad Global de Equipos)</span>
+                            <div class="field-desc">
+                                Mide la Disponibilidad, el Rendimiento y la Calidad de la planta. Un OEE bajo es un
+                                síntoma de que el plan de Logic APS está siendo boicoteado por paradas no programadas
+                                (averías) o micro-paradas en el piso.
+                            </div>
+                        </li>
+                        <li class="field-item">
+                            <span class="field-name">Mix de Demanda por Prioridad</span>
+                            <div class="field-desc">
+                                Gráfico circular que segmenta las órdenes en Urgente, Estándar y Especial.
+                                <br><strong>Análisis:</strong> Si más del 30% de sus órdenes son "Urgentes", su planta
+                                está perdiendo eficiencia por cambios de formato (Setups) constantes. Logic APS
+                                le permite visualizar esta "inflación de urgencia".
+                            </div>
+                        </li>
+                        <li class="field-item">
+                            <span class="field-name">Confiabilidad de Activos (MTTR / MTBF)</span>
+                            <div class="field-desc">
+                                • <strong>MTBF (Mean Time Between Failures):</strong> Tiempo promedio que una máquina
+                                opera antes de fallar. Si este valor baja, debe aumentar la frecuencia de sus
+                                preventivos.
+                                <br>• <strong>MTTR (Mean Time To Repair):</strong> Tiempo promedio en volver a poner en
+                                marcha la máquina. Si es alto, el motor APS reservará más "colchón" de tiempo para
+                                absorber la incertidumbre.
+                            </div>
+                        </li>
+                    </ul>
+                </section>
+
+                <hr style="opacity: 0.1; margin: 4rem 0;">
+
+                <section id="calibration">
+                    <h1>7. CALIBRACIÓN Y AUDITORÍA</h1>
+                    <p>Esta sección contiene las herramientas para asegurar la precisión del "Cerebro" de Logic APS.
+                        Para que las fechas de entrega sean exactas, los parámetros del motor deben reflejar la realidad
+                        física de la planta.</p>
+
+                    <div class="figure-container">
+                        <img src="assets/calibration.png" alt="Calibración de Estrategia">
+                        <div class="figure-caption">Figura 6. Panel de Configuración de Pesos y Prioridades del
+                            Algoritmo.</div>
+                    </div>
+
+                    <h3>7.1 Calibración del Algoritmo (Cerebro APS)</h3>
+                    <p>Usted puede ajustar el "comportamiento" del motor de planificación moviendo los siguientes pesos:
+                    </p>
+                    <ul class="field-list">
+                        <li class="field-item">
+                            <span class="field-name">Peso de la Fecha de Entrega (%)</span>
+                            <div class="field-desc">
+                                Cuanto más alto sea este valor, más "estricto" será el motor en cumplir la <em>Due
+                                    Date</em>
+                                aunque esto implique dejar máquinas ociosas o hacer más cambios de pieza. Es una
+                                estrategia de <strong>Servicio al Cliente al 100%</strong>.
+                            </div>
+                        </li>
+                        <li class="field-item">
+                            <span class="field-name">Peso de la Eficiencia de Recurso (%)</span>
+                            <div class="field-desc">
+                                Al priorizar la eficiencia, el motor agrupará órdenes que usen la misma herramienta o
+                                material para minimizar los tiempos de limpieza (Setup). Es una estrategia de
+                                <strong>Minimización de Costos Operativos</strong>.
+                            </div>
+                        </li>
+                        <li class="field-item">
+                            <span class="field-name">Factor de Buffer de Tiempo</span>
+                            <div class="field-desc">
+                                Un multiplicador de seguridad que se añade a cada operación para absorber la
+                                variabilidad humana. Si su planta es muy estable, puede bajarlo a 1.05; si es muy
+                                variable, súbalo a 1.25.
+                            </div>
+                        </li>
+                    </ul>
+
+                    <hr style="opacity: 0.1; margin: 2rem 0;">
+
+                    <h3 id="engine-cert">7.2 Certificación de Motor APS</h3>
+                    <p>El Laboratorio de Certificación es una herramienta de auditoría de estrés. Ejecuta <strong>36
+                            combinaciones
+                            estratégicas</strong> diferentes contra un conjunto de datos maestros patrón (Gold Dataset).
+                    </p>
+
+                    <div class="figure-container" style="max-width: 70%; margin-left: auto; margin-right: auto;">
+                        <img src="assets/certification.png" alt="Certificación de Motor">
+                        <div class="figure-caption">Figura 7. Auditoría de Robustez del Algoritmo.</div>
+                    </div>
+
+                    <p>¿Qué busca certificar esta matriz?</p>
+                    <ul class="field-list">
+                        <li class="field-item">
+                            <span class="field-name">Cruce de Políticas (MPS vs MRP)</span>
+                            <div class="field-desc">
+                                Audita si el sistema entrega fechas lógicas cuando se combina una programación
+                                JIT (Just-In-Time) con una política de compra de materiales basada en TOC.
+                            </div>
+                        </li>
+                        <li class="field-item">
+                            <span class="field-name">Diferencia de Makespan</span>
+                            <div class="field-desc">
+                                Compara cuánto tiempo total (Makespan) se ahorra al activar el <em>Overlap</em>
+                                bajo distintas restricciones. Si el ahorro es nulo, el sistema alerta sobre una
+                                mala configuración de rutas.
+                            </div>
+                        </li>
+                        <li class="field-item">
+                            <span class="field-name">Estatus "Gold Validated"</span>
+                            <div class="field-desc">
+                                Este sello indica que el motor ha pasado todas las pruebas de integridad: ninguna
+                                orden tiene fecha de fin previa a su fecha de inicio y no hay consumos de material
+                                imposibles (causalidad lógica).
+                            </div>
+                        </li>
+                    </ul>
+                </section>
+
+                <hr style="opacity: 0.1; margin: 4rem 0;">
+
+                <section id="data-masters">
+                    <h1>8. GESTIÓN DE DATOS Y MAESTROS</h1>
+                    <p>Esta sección es la "Base de Conocimiento" de la planta. Explica cómo Logic APS estructura la
+                        información técnica para alimentar al algoritmo de planificación.</p>
+
+                    <h3 id="dbm">8.1 Monitor de Buffers Dinámicos (DBM)</h3>
+                    <p>Basado en el estándar de <strong>Demand Driven MRP</strong>, este monitor permite visualizar
+                        el riesgo de las órdenes de trabajo no por fecha, sino por <em>consumo de amortiguador</em>.</p>
+
+                    <div class="figure-container">
+                        <img src="assets/buffers.png" alt="Gestión de Buffers">
+                        <div class="figure-caption">Figura 8. Monitor de Estado de Buffers (Color Code).</div>
+                    </div>
+
+                    <ul class="field-list">
+                        <li class="field-item">
+                            <span class="field-name">Código de Colores (Semáforo)</span>
+                            <div class="field-desc">
+                                • <strong>Verde (Safe):</strong> La orden tiene suficiente margen de tiempo.
+                                <br>• <strong>Amarillo (Watch):</strong> Se ha consumido más del 66% del tiempo de
+                                buffer. Requiere atención.
+                                <br>• <strong>Rojo (Critical):</strong> Consumo > 100%. La orden se entregará tarde a
+                                menos que se asigne recurso extra.
+                            </div>
+                        </li>
+                        <li class="field-item">
+                            <span class="field-name">Sugerencias de Optimización</span>
+                            <div class="field-desc">
+                                El sistema detecta automáticamente si un artículo tiene <em>exceso de stock</em> y
+                                sugiere reducir el lote mínimo de compra (MOQ) para liberar capital de trabajo.
+                            </div>
+                        </li>
+                    </ul>
+
+                    <hr style="opacity: 0.1; margin: 2rem 0;">
+
+                    <h3 id="explorer">8.2 Explorador de Datos (Ingeniería de Planta)</h3>
+                    <p>Es el punto de acceso central a las tablas maestras. Aquí es donde el usuario carga o
+                        sincroniza la "Foto" de su fábrica.</p>
+
+                    <div class="figure-container">
+                        <img src="assets/data_explorer.png" alt="Explorador de Datos">
+                        <div class="figure-caption">Figura 9. Repositorio de Ingeniería y Datos Crudos.</div>
+                    </div>
+
+                    <p>Campos críticos que el usuario debe supervisar:</p>
+                    <ul class="field-list">
+                        <li class="field-item">
+                            <span class="field-name">Maestro de Artículos: Lote Mínimo (MoQ)</span>
+                            <div class="field-desc">
+                                Cantidad más pequeña que el proveedor le permite comprar o que su fábrica debe producir
+                                por eficiencia. Un MoQ muy alto genera inventario innecesario.
+                            </div>
+                        </li>
+                        <li class="field-item">
+                            <span class="field-name">Estructuras (BOM)</span>
+                            <div class="field-desc">
+                                El árbol de componentes. Logic APS utiliza esta jerarquía para asegurar que ninguna
+                                Orden de Trabajo comience si los componentes de nivel inferior no están disponibles.
+                            </div>
+                        </li>
+                        <li class="field-item">
+                            <span class="field-name">Ruteos y Tiempos</span>
+                            <div class="field-desc">
+                                Define la secuencia de máquinas. Contiene el <strong>Setup Time</strong> (preparación)
+                                y el <strong>Run Time</strong> (procesamiento unitario). Estos valores deben ser
+                                auditados regularmente para que el Gantt sea realista.
+                            </div>
+                        </li>
+                    </ul>
+
+                    <hr style="opacity: 0.1; margin: 2rem 0;">
+
+                    <h3 id="outputs">8.3 Salidas y Reportes (HUB de Exportación)</h3>
+                    <p>Una vez que el plan es satisfactorio en el simulador, el usuario utiliza este módulo para
+                        comunicar las decisiones a la planta y al ERP.</p>
+
+                    <div class="figure-container">
+                        <img src="assets/outputs.png" alt="Salidas de Sistema">
+                        <div class="figure-caption">Figura 10. Generador de Informes Operativos y Despacho.</div>
+                    </div>
+
+                    <ul class="field-list">
+                        <li class="field-item">
+                            <span class="field-name">Lista de Kitting (Picking)</span>
+                            <div class="field-desc">
+                                Informe detallado para el Almacén. Indica exactamente qué componentes deben entregarse
+                                a cada Centro de Trabajo y en qué momento preciso para iniciar la producción.
+                            </div>
+                        </li>
+                        <li class="field-item">
+                            <span class="field-name">Programa Maestro (MPS)</span>
+                            <div class="field-desc">
+                                Listado de fechas de compromiso ATP (Available to Promise). Es la información que se
+                                devuelve al área comercial para informar a los clientes.
+                            </div>
+                        </li>
+                        <li class="field-item">
+                            <span class="field-name">Alertas de Excepción</span>
+                            <div class="field-desc">
+                                Reporte de "todo lo que salió mal". Lista órdenes retrasadas, máquinas con sobrecarga
+                                y falta de insumos, permitiendo una gestión proactiva.
+                            </div>
+                        </li>
+                    </ul>
+                </section>
+
+                <hr style="opacity: 0.1; margin: 4rem 0;">
+
+                <section id="settings">
+                    <h1>9. CONFIGURACIÓN DEL SISTEMA</h1>
+                    <p>Ajustes generales de la aplicación, idioma y preferencias de visualización.</p>
+
+                    <div class="figure-container">
+                        <img src="assets/settings.png" alt="Configuración">
+                        <div class="figure-caption">Figura 11. Panel de Ajustes Globales de Usuario.</div>
+                    </div>
+                </section>
+
+                <hr style="opacity: 0.1; margin: 4rem 0;">
+
+                <section id="initial-setup">
+                    <h1>ANEXO: GUÍA DE CARGA INICIAL (QUÉ DEBE CARGAR EL USUARIO)</h1>
+                    <p>Para que el motor APS funcione con precisión, el usuario debe cargar los siguientes pilares de
+                        datos
+                        en el <strong>Explorador Base</strong>:</p>
+
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Entidad</th>
+                                <th>¿Qué es?</th>
+                                <th>Dato Crítico a Cargar</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Artículos</strong></td>
+                                <td>Productos terminados e insumos.</td>
+                                <td><strong>Lead Time:</strong> Tiempo de compra/fabricación. <br><strong>MOQ:</strong>
+                                    Lote mínimo.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Centros de Trabajo</strong></td>
+                                <td>Agrupación de máquinas o personas.</td>
+                                <td><strong>Eficiencia:</strong> Factor humano (%) de productividad real.
+                                    <br><strong>Disponibilidad:</strong> Turnos de 8h, 12h o 24h.
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Ruteos (Estructuras)</strong></td>
+                                <td>Pasos para fabricar un producto.</td>
+                                <td><strong>Tiempos de Setup:</strong> Cuánto tarda en limpiar/preparar la máquina.
+                                    <br><strong>Tiempos de Run:</strong> Segundos por pieza.
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Ordenes de Operación</strong></td>
+                                <td>La demanda actual.</td>
+                                <td><strong>Fecha de Entrega (Due Date):</strong> La promesa al cliente.
+                                    <br><strong>Prioridad:</strong> Valor del 1 al 10.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="info-box">
+                        <span>💡</span>
+                        <p><strong>REGLA DE ORO:</strong> Logic APS es un optimizador, no un creador de datos. Si un
+                            tiempo
+                            de ruteo es de 10 minutos pero en la realidad el operario tarda 20, el sistema le entregará
+                            un plan
+                            imposible de cumplir. Use la Inteligencia Analítica para corregir sus maestros.</p>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+    </div>
+
+    <footer>
+        <div>© Softland Inversiones S.L. , 2026</div>
+        <div>Página: 1 / 5</div>
+        <div>Template: LOGIC_APS_MASTER_GUIDE.dotx</div>
+    </footer>
+
+    <script>
+        const navItems = document.querySelectorAll('.toc-item');
+        const sections = document.querySelectorAll('section');
+        const main = document.querySelector('main');
+
+        main.addEventListener('scroll', () => {
+            let current = "";
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                if (main.scrollTop >= (sectionTop - 300)) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navItems.forEach(item => {
+                item.classList.remove('active');
+                if (item.getAttribute('href') === `#${current}`) {
+                    item.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>
