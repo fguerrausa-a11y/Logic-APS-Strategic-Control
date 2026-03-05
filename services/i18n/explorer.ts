@@ -106,4 +106,58 @@ export const explorer: Translations = {
     'quantity_ordered': { es: 'Cant. Pedida', en: 'Qty Ordered', fr: 'Qté Commandée', de: 'Bestellte Menge', pt: 'Cant. Pedida', zh: '订购数量' },
     'quantity_completed': { es: 'Cant. Completada', en: 'Qty Completed', fr: 'Qté Terminée', de: 'Fertiggestellte Menge', pt: 'Cant. Concluída', zh: '完成数量' },
     'balance': { es: 'Saldo', en: 'Balance', fr: 'Solde', de: 'Restmenge', pt: 'Saldo', zh: '余额' },
+
+    // ─── Columnas tabla work_centers ──────────────────────────────────────────
+    'capacity_per_shift_hours': { es: 'Horas por Turno', en: 'Capacity per Shift (Hrs)', fr: 'Capacité par Équipe (h)', de: 'Kapazität pro Schicht (Std)', pt: 'Horas por Turno', zh: '每班产能（小时）' },
+    'number_of_shifts': { es: 'Número de Turnos', en: 'Number of Shifts', fr: 'Nombre d\'Équipes', de: 'Anzahl Schichten', pt: 'Número de Turnos', zh: '班次数量' },
+    'overlap_percentage': { es: 'Solapamiento (%)', en: 'Overlap (%)', fr: 'Chevauchement (%)', de: 'Überlappung (%)', pt: 'Sobreposição (%)', zh: '重叠率 (%)' },
+    'is_active': { es: 'Activo', en: 'Active', fr: 'Actif', de: 'Aktiv', pt: 'Ativo', zh: '启用' },
+    'shift_id': { es: 'Turno Asignado', en: 'Assigned Shift', fr: 'Équipe Assignée', de: 'Zugewiesene Schicht', pt: 'Turno Atribuído', zh: '指定班次' },
+    'ignore_shifts': { es: 'Opera 24/7', en: 'Operates 24/7', fr: 'Fonctionne 24h/24', de: 'Betrieb 24/7', pt: 'Opera 24/7', zh: '全天运行' },
+    'machine_count': { es: 'Cantidad de Equipos', en: 'Machine Count', fr: 'Nombre de Machines', de: 'Maschinenanzahl', pt: 'Quantidade de Equipamentos', zh: '设备数量' },
+    'expected_delivery_date': { es: 'Fecha Entrega Esperada', en: 'Expected Delivery Date', fr: 'Date de Livraison Prévue', de: 'Erwartetes Lieferdatum', pt: 'Data de Entrega Prevista', zh: '预计交货日期' },
+    'start_time': { es: 'Hora Inicio', en: 'Start Time', fr: 'Heure de Début', de: 'Startzeit', pt: 'Hora de Início', zh: '开始时间' },
+    'end_time': { es: 'Hora Fin', en: 'End Time', fr: 'Heure de Fin', de: 'Endzeit', pt: 'Hora de Término', zh: '结束时间' },
+    'days_of_week': { es: 'Días de la Semana', en: 'Days of Week', fr: 'Jours de la Semaine', de: 'Wochentage', pt: 'Dias da Semana', zh: '星期几' },
+
+    'maintenance_type': { es: 'Tipo de Mantenimiento', en: 'Maintenance Type', fr: 'Type de Maintenance', de: 'Wartungstyp', pt: 'Tipo de Manutenção', zh: '维护类型' },
+    'frequency_days': { es: 'Frecuencia (Días)', en: 'Frequency (Days)', fr: 'Fréquence (Jours)', de: 'Häufigkeit (Tage)', pt: 'Frequência (Dias)', zh: '频率（天）' },
+    'duration_hours': { es: 'Duración (Horas)', en: 'Duration (Hours)', fr: 'Durée (Heures)', de: 'Dauer (Stunden)', pt: 'Duração (Horas)', zh: '持续时间（小时）' },
+    'next_date': { es: 'Próxima Fecha', en: 'Next Date', fr: 'Prochaine Date', de: 'Nächstes Datum', pt: 'Próxima Data', zh: '下次日期' },
+    'sync_with_erp': { es: 'Sincronizar con ERP', en: 'Sync with ERP', fr: 'Synchroniser avec ERP', de: 'Mit ERP synchronisieren', pt: 'Sincronizar com ERP', zh: '与 ERP 同步' },
+    'sync_in_progress': { es: 'Sincronizando...', en: 'Syncing...', fr: 'Synchronisation...', de: 'Synchronisierung...', pt: 'Sincronizando...', zh: '同步中...' },
+    'edit_btn': { es: 'Editar', en: 'Edit', fr: 'Modifier', de: 'Bearbeiten', pt: 'Editar', zh: '编辑' },
+    'delete_btn': { es: 'Eliminar', en: 'Delete', fr: 'Supprimer', de: 'Löschen', pt: 'Excluir', zh: '删除' },
+
+    // ─── Columnas tabla items (Artículos) ─────────────────────────────────────
+    'weight': { es: 'Peso', en: 'Weight', fr: 'Poids', de: 'Gewicht', pt: 'Peso', zh: '重量' },
+    'color': { es: 'Color', en: 'Color', fr: 'Couleur', de: 'Farbe', pt: 'Cor', zh: '颜色' },
+    'volume': { es: 'Volumen', en: 'Volume', fr: 'Volume', de: 'Volumen', pt: 'Volume', zh: '体积' },
+    'initial_stock': { es: 'Stock Inicial', en: 'Initial Stock', fr: 'Stock Initial', de: 'Anfangsbestand', pt: 'Estoque Inicial', zh: '初始库存' },
+    'unit_price': { es: 'Precio Unitario', en: 'Unit Price', fr: 'Prix Unitaire', de: 'Stückpreis', pt: 'Preço Unitário', zh: '单价' },
+    'category': { es: 'Categoría', en: 'Category', fr: 'Catégorie', de: 'Kategorie', pt: 'Categoria', zh: '类别' },
+
+    // ─── Columnas tabla BOM (Estructura) ──────────────────────────────────────
+    'parent_item_id': { es: 'Artículo Padre', en: 'Parent Item ID', fr: 'Article Parent', de: 'Übergeordneter Artikel', pt: 'Artigo Pai', zh: '父级物料 ID' },
+    'component_item_id': { es: 'Artículo Componente', en: 'Component Item ID', fr: 'Article Composant', de: 'Komponentenartikel', pt: 'Artigo Componente', zh: '组件物料 ID' },
+    'quantity_required': { es: 'Cantidad Requerida', en: 'Quantity Required', fr: 'Quantité Requise', de: 'Erforderliche Menge', pt: 'Quantidade Necessária', zh: '所需数量' },
+
+    // ─── Columnas tabla routings (Flujos / Rutas) ─────────────────────────────
+    'operation_sequence': { es: 'Secuencia de Operación', en: 'Operation Sequence', fr: 'Séquence d\'Opération', de: 'Operationssequenz', pt: 'Sequência de Operação', zh: '工序顺序' },
+    'operation_description': { es: 'Descripción de la Operación', en: 'Operation Description', fr: 'Description de l\'Opération', de: 'Operationsbeschreibung', pt: 'Descrição da Operação', zh: '工序描述' },
+    'setup_time_minutes': { es: 'Setup (Min.)', en: 'Setup Time (Min.)', fr: 'Réglage (Min.)', de: 'Rüstzeit (Min.)', pt: 'Setup (Min.)', zh: '准备时间（分钟）' },
+    'run_time_minutes_per_unit': { es: 'Ciclo (Min./Un.)', en: 'Run Time (Min./Unit)', fr: 'Temps de Cycle (Min./Un.)', de: 'Zykluszeit (Min./Einh.)', pt: 'Ciclo (Min./Un.)', zh: '循环时间（分钟/单元）' },
+
+    // ─── Columnas tabla maintenance_plans ─────────────────────────────────────
+    'title': { es: 'Título', en: 'Title', fr: 'Titre', de: 'Titel', pt: 'Título', zh: '标题' },
+    'type': { es: 'Tipo', en: 'Type', fr: 'Type', de: 'Typ', pt: 'Tipo', zh: '类型' },
+
+    // ─── Columnas tabla shifts (Turnos) ───────────────────────────────────────
+    'break_minutes': { es: 'Descanso (Min.)', en: 'Break (Min.)', fr: 'Pause (Min.)', de: 'Pause (Min.)', pt: 'Intervalo (Min.)', zh: '休息（分钟）' },
+    'max_capacity': { es: 'Cap. Máxima', en: 'Max Capacity', fr: 'Cap. Max.', de: 'Max. Kapazität', pt: 'Cap. Máxima', zh: '最大产能' },
+
+    // ─── UI General ───────────────────────────────────────────────────────────
+    'actions': { es: 'Acciones', en: 'Actions', fr: 'Actions', de: 'Aktionen', pt: 'Ações', zh: '操作' },
+    'master_explorer': { es: 'Explorador Base', en: 'Base Explorer', fr: 'Explorateur', de: 'Stamm-Explorer', pt: 'Explorador', zh: '数据探索器' },
+    'no_components': { es: 'Sin componentes en fórmula.', en: 'No formula components.', fr: 'Aucun composant de formule.', de: 'Keine Formelkomponenten.', pt: 'Sem componentes na fórmula.', zh: '没有配方组件。' },
 };

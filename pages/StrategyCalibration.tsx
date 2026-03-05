@@ -69,7 +69,13 @@ const StrategyCalibration: React.FC = () => {
         reprovision_policy: 'MRP Standard',
     });
 
-    const [aiAnalysisHistory, setAiAnalysisHistory] = useState<Array<{ id: string, content: string, timestamp: string, config: any, result: APSResult | null, isError?: boolean }>>([]);
+    const STORAGE_KEY = 'aps_ai_analysis_history';
+    const [aiAnalysisHistory, setAiAnalysisHistory] = useState<Array<{ id: string, content: string, timestamp: string, config: any, result: APSResult | null, isError?: boolean }>>(() => {
+        try {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            return saved ? JSON.parse(saved) : [];
+        } catch { return []; }
+    });
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [rawSettings, setRawSettings] = useState<any>(null);
 
@@ -81,6 +87,17 @@ const StrategyCalibration: React.FC = () => {
     useEffect(() => {
         if (!selectedScenarioId && scenarios.length > 0) fetchBaseData();
     }, [scenarios]);
+
+    // Persistir historial de análisis IA en localStorage
+    useEffect(() => {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(aiAnalysisHistory));
+        } catch { /* quota exceeded */ }
+    }, [aiAnalysisHistory]);
+
+    const deleteAnalysis = (id: string) => {
+        setAiAnalysisHistory(prev => prev.filter(entry => entry.id !== id));
+    };
 
     const fetchBaseData = async () => {
         setLoading(true);
@@ -515,7 +532,16 @@ const StrategyCalibration: React.FC = () => {
                                                         <span className="text-[9px] font-black uppercase px-3 py-1 bg-[var(--bg-sidebar)] rounded-full text-indigo-400 border border-indigo-500/20">
                                                             {idx === 0 ? 'Ejecución más reciente' : `Análisis previo #${aiAnalysisHistory.length - idx}`}
                                                         </span>
-                                                        <span className="text-[10px] font-bold text-[var(--text-muted)]">{entry.timestamp}</span>
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="text-[10px] font-bold text-[var(--text-muted)]">{entry.timestamp}</span>
+                                                            <button
+                                                                onClick={() => deleteAnalysis(entry.id)}
+                                                                title="Eliminar este análisis"
+                                                                className="w-7 h-7 flex items-center justify-center rounded-xl text-[var(--text-muted)] hover:text-rose-400 hover:bg-rose-500/10 transition-all duration-200"
+                                                            >
+                                                                <span className="material-symbols-outlined text-base" translate="no">delete</span>
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                     <div className="prose prose-invert prose-sm max-w-none text-[var(--text-main)]">
                                                         <ReactMarkdown remarkPlugins={[remarkGfm]}>

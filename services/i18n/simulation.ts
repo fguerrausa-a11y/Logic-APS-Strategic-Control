@@ -50,6 +50,7 @@ export const simulation: Translations = {
     'machines_count': { es: '{count} Equipos', en: '{count} Units', fr: '{count} Unités', de: '{count} Einheiten', pt: '{count} Equipamentos', zh: '{count} 台设备' },
     'load': { es: 'Carga', en: 'Load', fr: 'Charge', de: 'Auslastung', pt: 'Carga', zh: '负载' },
     'saturated': { es: 'Saturado', en: 'Saturated', fr: 'Saturé', de: 'Gesättigt', pt: 'Saturado', zh: '饱和' },
+    'warning': { es: 'Precaución', en: 'Warning', fr: 'Attention', de: 'Warnung', pt: 'Cuidado', zh: '警告' },
     'operational': { es: 'Operativo', en: 'Operational', fr: 'Opérationnel', de: 'Operativ', pt: 'Operativo', zh: '运行中' },
     'data_explorer': { es: 'Explorador de Datos', en: 'Data Explorer', fr: 'Explorateur de Données', de: 'Daten-Explorer', pt: 'Explorador de Dados', zh: '数据资源管理器' },
     'delete_simulation': { es: 'Eliminar Simulación', en: 'Delete Simulation', fr: 'Supprimer Simulation', de: 'Simulation Löschen', pt: 'Excluir Simulação', zh: '删除模拟' },

@@ -783,6 +783,16 @@ export const apsAlgorithm = {
             if (pPOs.length > 0) await supabase.from('proposed_purchase_orders').insert(pPOs);
             if (pOps.length > 0) await supabase.from('proposed_operations').insert(pOps);
 
+            // Persist bottlenecks computed by the motor into the scenario record
+            // so the UI can read them directly (avoids the heuristic in Simulation.tsx)
+            await supabase.from('scenarios').update({
+                simulation_overrides: {
+                    ...(scenario?.simulation_overrides || {}),
+                    last_bottlenecks: result.bottlenecks,
+                    last_run_at: new Date().toISOString()
+                }
+            }).eq('id', scenarioId);
+
             if (onProgress) onProgress(100);
             return result;
         } catch (error) {

@@ -54,19 +54,28 @@ const LoadAnalysisPage: React.FC = () => {
       if (wcs && ops && scenario && allMachines) {
         const overrides = scenario.simulation_overrides?.machine_counts || {};
 
-        const loads = wcs.map(wc => {
-          const wcOps = ops.filter(o => o.work_center_id === wc.id);
-          const totalRunTime = wcOps.reduce((acc, o) => acc + (o.run_time_minutes || 0) + (o.setup_time_minutes || 0), 0);
+        // ── Horizonte real del escenario ─────────────────────────────────────
+        // Usamos el rango real de start_date / end_date de las operaciones,
+        // no una ventana fija de 30 días que subestima la capacidad.
+        const allDates = ops.flatMap((o: any) => [
+          o.start_date ? new Date(o.start_date).getTime() : null,
+          o.end_date ? new Date(o.end_date).getTime() : null,
+        ]).filter(Boolean) as number[];
 
-          const dbMachines = allMachines.filter(m => m.work_center_id === wc.id);
+        const horizonStart = allDates.length > 0 ? new Date(Math.min(...allDates)) : new Date();
+        const horizonEnd = allDates.length > 0 ? new Date(Math.max(...allDates)) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+        const loads = wcs.map((wc: any) => {
+          const wcOps = ops.filter((o: any) => o.work_center_id === wc.id);
+          const totalRunTime = wcOps.reduce((acc: number, o: any) => acc + (o.run_time_minutes || 0) + (o.setup_time_minutes || 0), 0);
+
+          const dbMachines = allMachines.filter((m: any) => m.work_center_id === wc.id);
           const overrideCount = overrides[wc.id];
           const machineCount = overrideCount !== undefined ? Number(overrideCount) : dbMachines.length;
 
-          const start = new Date();
-          const end = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 day horizon
-
+          // Capacidad usando el horizonte real del escenario
           const baseCapacity = dbMachines.length > 0
-            ? dbMachines.reduce((acc, m) => acc + calculateCapacityForPeriod(start, end, m), 0) / dbMachines.length
+            ? dbMachines.reduce((acc: number, m: any) => acc + calculateCapacityForPeriod(horizonStart, horizonEnd, m), 0) / dbMachines.length
             : 8 * 60 * 30;
 
           const totalCapacityMinutes = baseCapacity * machineCount;
@@ -89,8 +98,6 @@ const LoadAnalysisPage: React.FC = () => {
           const drumWc = sorted[0];
           drumWc.drum = true;
 
-          // Calculate TOC Buffer (Time ahead of drum in the horizon)
-          // Simplified: total hours in queue for this WC
           const bufferHours = Math.round(drumWc.totalMinutes / 60);
 
           setTocStatus({
@@ -131,9 +138,9 @@ const LoadAnalysisPage: React.FC = () => {
 
       if (items) {
         setBuffers(items.map(item => {
-          // Use initial_stock as the base since current_stock doesn't exist in schema yet
-          const stock = item.initial_stock || 0;
-          // Fallback to min_purchase_qty if safety_stock is missing, or default to 10
+          // current_stock = stock en tiempo real; initial_stock = baseline de apertura
+          const stock = item.current_stock ?? item.initial_stock ?? 0;
+          // safety_stock es el buffer objetivo; fallback a min_purchase_qty o 10
           const safety = item.safety_stock || item.min_purchase_qty || 10;
 
           // Calculate simulated consumption for this item based on what we're producing (PWOs)

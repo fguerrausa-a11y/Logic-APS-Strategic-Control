@@ -94,59 +94,75 @@ const AnalyticsPage: React.FC = () => {
                             </div>
 
                             <div className="flex-1 relative mt-10">
-                                <svg viewBox="0 0 700 300" className="w-full h-full drop-shadow-2xl">
-                                    {/* Grid Lines */}
-                                    {[0, 1, 2, 3].map(i => (
-                                        <line key={i} x1="0" y1={i * 100} x2="700" y2={i * 100} stroke="var(--border-color)" strokeWidth="1" strokeDasharray="5,5" opacity="0.3" />
-                                    ))}
+                                {(() => {
+                                    const W = 700, H = 300, PAD = 20;
+                                    const pts = data.performanceData;
+                                    if (!pts || pts.length === 0) return null;
 
-                                    {/* Area Gradient (Real) */}
-                                    <defs>
-                                        <linearGradient id="grad-real" x1="0%" y1="0%" x2="0%" y2="100%">
-                                            <stop offset="0%" style={{ stopColor: '#10b981', stopOpacity: 0.2 }} />
-                                            <stop offset="100%" style={{ stopColor: '#10b981', stopOpacity: 0 }} />
-                                        </linearGradient>
-                                        <linearGradient id="grad-planned" x1="0%" y1="0%" x2="0%" y2="100%">
-                                            <stop offset="0%" style={{ stopColor: '#6366f1', stopOpacity: 0.1 }} />
-                                            <stop offset="100%" style={{ stopColor: '#6366f1', stopOpacity: 0 }} />
-                                        </linearGradient>
-                                    </defs>
+                                    const maxVal = Math.max(...pts.map(p => Math.max(p.planned, p.real)), 1);
+                                    const xStep = (W - PAD * 2) / (pts.length - 1 || 1);
 
-                                    {/* Paths would go here - simplified for stability */}
-                                    <path
-                                        d="M 0 250 Q 175 200 350 220 T 700 150 V 300 H 0 Z"
-                                        fill="url(#grad-planned)"
-                                        className="animate-pulse"
-                                    />
-                                    <path
-                                        d="M 0 250 Q 175 200 350 220 T 700 150"
-                                        fill="none"
-                                        stroke="#6366f1"
-                                        strokeWidth="4"
-                                        strokeLinecap="round"
-                                    />
+                                    // Map data point → SVG coordinate
+                                    const toX = (i: number) => PAD + i * xStep;
+                                    const toY = (v: number) => PAD + (1 - v / maxVal) * (H - PAD * 2);
 
-                                    <path
-                                        d="M 0 280 Q 175 150 350 260 T 700 100 V 300 H 0 Z"
-                                        fill="url(#grad-real)"
-                                    />
-                                    <path
-                                        d="M 0 280 Q 175 150 350 260 T 700 100"
-                                        fill="none"
-                                        stroke="#10b981"
-                                        strokeWidth="4"
-                                        strokeLinecap="round"
-                                        strokeDasharray="1000"
-                                        strokeDashoffset="0"
-                                    />
-                                </svg>
+                                    // Build smooth SVG path from points array
+                                    const buildPath = (values: number[]) => {
+                                        if (values.length === 1) return `M ${toX(0)} ${toY(values[0])}`;
+                                        return values.map((v, i) => {
+                                            if (i === 0) return `M ${toX(0)} ${toY(v)}`;
+                                            const cpX = (toX(i - 1) + toX(i)) / 2;
+                                            return `C ${cpX} ${toY(values[i - 1])}, ${cpX} ${toY(v)}, ${toX(i)} ${toY(v)}`;
+                                        }).join(' ');
+                                    };
 
-                                <div className="absolute inset-0 flex justify-between px-2 items-end pb-2">
-                                    {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map(day => (
-                                        <span key={day} className="text-[9px] font-black opacity-30">{day}</span>
-                                    ))}
-                                </div>
+                                    const plannedPath = buildPath(pts.map(p => p.planned));
+                                    const realPath = buildPath(pts.map(p => p.real));
+                                    const lastX = toX(pts.length - 1);
+                                    const firstY = toY(pts[0].real);
+
+                                    return (
+                                        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full drop-shadow-2xl">
+                                            <defs>
+                                                <linearGradient id="grad-real" x1="0%" y1="0%" x2="0%" y2="100%">
+                                                    <stop offset="0%" style={{ stopColor: '#10b981', stopOpacity: 0.2 }} />
+                                                    <stop offset="100%" style={{ stopColor: '#10b981', stopOpacity: 0 }} />
+                                                </linearGradient>
+                                                <linearGradient id="grad-planned" x1="0%" y1="0%" x2="0%" y2="100%">
+                                                    <stop offset="0%" style={{ stopColor: '#6366f1', stopOpacity: 0.1 }} />
+                                                    <stop offset="100%" style={{ stopColor: '#6366f1', stopOpacity: 0 }} />
+                                                </linearGradient>
+                                            </defs>
+
+                                            {/* Grid lines */}
+                                            {[0.25, 0.5, 0.75, 1].map(pct => (
+                                                <line key={pct} x1={PAD} y1={toY(maxVal * pct)} x2={W - PAD} y2={toY(maxVal * pct)}
+                                                    stroke="var(--border-color)" strokeWidth="1" strokeDasharray="4,4" opacity="0.3" />
+                                            ))}
+
+                                            {/* Planned area + line */}
+                                            <path d={`${plannedPath} L ${lastX} ${H} L ${PAD} ${H} Z`} fill="url(#grad-planned)" />
+                                            <path d={plannedPath} fill="none" stroke="#6366f1" strokeWidth="3" strokeLinecap="round" />
+
+                                            {/* Real area + line */}
+                                            <path d={`${realPath} L ${lastX} ${H} L ${PAD} ${firstY} Z`} fill="url(#grad-real)" />
+                                            <path d={realPath} fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" />
+
+                                            {/* Data points + X labels */}
+                                            {pts.map((p, i) => (
+                                                <g key={i}>
+                                                    <circle cx={toX(i)} cy={toY(p.planned)} r="4" fill="#6366f1" opacity="0.8" />
+                                                    <circle cx={toX(i)} cy={toY(p.real)} r="4" fill="#10b981" opacity="0.8" />
+                                                    <text x={toX(i)} y={H - 2} textAnchor="middle" fontSize="10" fill="var(--text-muted)" opacity="0.5" fontWeight="bold">
+                                                        {p.name}
+                                                    </text>
+                                                </g>
+                                            ))}
+                                        </svg>
+                                    );
+                                })()}
                             </div>
+
                         </div>
 
                         {/* DEMAND MIX - CSS CONIC GRADIENT */}

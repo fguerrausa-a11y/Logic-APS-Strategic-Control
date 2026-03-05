@@ -197,13 +197,19 @@ const SchedulePage: React.FC = () => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const headerScrollRef = useRef<HTMLDivElement>(null);
   const footerScrollRef = useRef<HTMLDivElement>(null);
+  const sidebarScrollRef = useRef<HTMLDivElement>(null);
 
   const syncScroll = (e: React.UIEvent<HTMLDivElement>, ...targetRefs: React.RefObject<HTMLDivElement>[]) => {
     if (e.currentTarget) {
       const left = e.currentTarget.scrollLeft;
+      const top = e.currentTarget.scrollTop;
       targetRefs.forEach(ref => {
         if (ref.current && ref.current !== e.currentTarget) {
           ref.current.scrollLeft = left;
+          // Also sync vertical scroll for the sidebar panel
+          if (ref === sidebarScrollRef) {
+            ref.current.scrollTop = top;
+          }
         }
       });
     }
@@ -633,8 +639,13 @@ const SchedulePage: React.FC = () => {
                   </div>
                 </div>
               )}
-              <div className="flex h-16 border-b border-[var(--border-color)] bg-[var(--bg-sidebar)] shrink-0 z-30 shadow-md">
-                <div className="w-[180px] border-r border-[var(--border-color)] shrink-0 p-3 sticky left-0 z-40 bg-[var(--bg-sidebar)] flex items-center shadow-[4px_0_10px_rgba(0,0,0,0.2)]">
+              {/* Header: RESOURCES label fixed + timeline scrollable */}
+              <div className="flex h-16 border-b border-[var(--border-color)] bg-[var(--bg-sidebar)] shrink-0 z-30 shadow-md" style={{ overflow: 'hidden' }}>
+                {/* Fixed left label — absolutely positioned to never scroll */}
+                <div
+                  className="border-r border-[var(--border-color)] shrink-0 p-3 z-40 bg-[var(--bg-sidebar)] flex items-center shadow-[4px_0_10px_rgba(0,0,0,0.2)]"
+                  style={{ width: `${SIDEBAR_WIDTH}px`, minWidth: `${SIDEBAR_WIDTH}px` }}
+                >
                   <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">{t('resources')}</span>
                 </div>
                 <div className="flex-1 overflow-hidden" ref={headerScrollRef}>
@@ -663,213 +674,237 @@ const SchedulePage: React.FC = () => {
                   </div>
                 </div>
               </div>
-              <div
-                className="flex-1 overflow-auto bg-grid-white/[0.01] scrollbar-premium"
-                ref={scrollContainerRef}
-                onScroll={(e) => {
-                  syncScroll(e, headerScrollRef, footerScrollRef);
-                }}
-              >
-                <div className="relative" style={{ width: `${viewRange.days * pixelsPerUnit + SIDEBAR_WIDTH}px`, height: `${machines.length * ROW_HEIGHT}px` }}>
-                  <svg className="absolute top-0 bottom-0 pointer-events-none z-50" style={{ left: `${SIDEBAR_WIDTH}px`, width: `${viewRange.days * pixelsPerUnit}px`, height: '100%' }}>
-                    <defs>
-                      <marker id="arrowhead" markerWidth="6" markerHeight="6" refX="6" refY="3" orientation="auto">
-                        <path d="M0,0 L6,3 L0,6" fill="none" stroke="var(--accent)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                      </marker>
-                    </defs>
-                    {operations.map(op => {
-                      const clean = (id: any) => String(id || '').toUpperCase().replace(/^(WO\-|OP\-|O\-)/i, '').trim();
-                      const opWO = clean(op.work_order_id);
+              {/* Body: fixed left sidebar panel + scrollable grid panel, side by side */}
+              <div className="flex-1 flex overflow-hidden">
+                {/* Fixed left column — never scrolls horizontally */}
+                <div
+                  className="shrink-0 border-r border-[var(--border-color)] overflow-y-auto scrollbar-none z-20 bg-[var(--bg-sidebar)] shadow-[4px_0_12px_rgba(0,0,0,0.15)]"
+                  style={{ width: `${SIDEBAR_WIDTH}px`, minWidth: `${SIDEBAR_WIDTH}px` }}
+                  ref={sidebarScrollRef}
+                >
+                  {machines.map((machine, mIdx) => (
+                    <div
+                      key={`label-${machine.id}`}
+                      className={`flex flex-col justify-center px-4 border-b border-[var(--border-color)] group-hover:bg-[var(--row-hover)] ${mIdx % 2 === 0 ? 'bg-[var(--bg-sidebar)]' : 'bg-black/[0.02]'}`}
+                      style={{ height: `${ROW_HEIGHT}px` }}
+                    >
+                      <h4 className="font-black text-[10px] uppercase tracking-tighter text-[var(--text-main)] w-full mb-0.5 whitespace-nowrap truncate">{machine.name}</h4>
+                      <p className="text-[7px] text-indigo-500 font-black uppercase tracking-widest opacity-80 whitespace-nowrap truncate">{machine.work_center?.name || t('center_placeholder')}</p>
+                    </div>
+                  ))}
+                </div>
 
-                      // Find ALL operations belonging to this production flow (same WO tree)
-                      const treeFlow = operations
-                        .filter(o => clean(o.work_order_id) === opWO)
-                        .sort((a, b) => {
-                          const timeA = new Date(a.start_date).getTime();
-                          const timeB = new Date(b.start_date).getTime();
-                          if (timeA !== timeB) return timeA - timeB;
-                          return Number(a.operation_sequence) - Number(b.operation_sequence);
-                        });
+                {/* Scrollable gantt grid */}
+                <div
+                  className="flex-1 overflow-auto bg-grid-white/[0.01] scrollbar-premium"
+                  ref={scrollContainerRef}
+                  onScroll={(e) => {
+                    syncScroll(e, headerScrollRef, footerScrollRef, sidebarScrollRef);
+                  }}
+                >
+                  <div className="relative" style={{ width: `${viewRange.days * pixelsPerUnit}px`, height: `${machines.length * ROW_HEIGHT}px` }}>
+                    {/* SVG arrows — clipped strictly inside this grid area, never bleeds left */}
+                    <svg
+                      className="absolute top-0 left-0 pointer-events-none z-50"
+                      style={{ width: `${viewRange.days * pixelsPerUnit}px`, height: '100%', overflow: 'hidden' }}
+                    >
+                      <defs>
+                        <marker id="arrowhead" markerWidth="6" markerHeight="6" refX="6" refY="3" orientation="auto">
+                          <path d="M0,0 L6,3 L0,6" fill="none" stroke="var(--accent)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                        </marker>
+                      </defs>
+                      {operations.map(op => {
+                        const clean = (id: any) => String(id || '').toUpperCase().replace(/^(WO\-|OP\-|O\-)/i, '').trim();
+                        const opWO = clean(op.work_order_id);
 
-                      const myIdx = treeFlow.findIndex(o => o.id === op.id);
-                      const next = treeFlow[myIdx + 1];
+                        // Find ALL operations belonging to this production flow (same WO tree)
+                        const treeFlow = operations
+                          .filter(o => clean(o.work_order_id) === opWO)
+                          .sort((a, b) => {
+                            const timeA = new Date(a.start_date).getTime();
+                            const timeB = new Date(b.start_date).getTime();
+                            if (timeA !== timeB) return timeA - timeB;
+                            return Number(a.operation_sequence) - Number(b.operation_sequence);
+                          });
 
-                      if (!next) return null;
+                        const myIdx = treeFlow.findIndex(o => o.id === op.id);
+                        const next = treeFlow[myIdx + 1];
 
-                      // Edge alignment
-                      const x1 = getPos(op.end_date);
-                      const x2 = getPos(next.start_date) - 2;
-                      const mIdx1 = machines.findIndex(m => String(m.id) === String(op.machine_id));
-                      const mIdx2 = machines.findIndex(m => String(m.id) === String(next.machine_id));
+                        if (!next) return null;
 
-                      if (mIdx1 < 0 || mIdx2 < 0) return null;
+                        // Edge alignment
+                        const x1 = getPos(op.end_date);
+                        const x2 = getPos(next.start_date) - 2;
+                        const mIdx1 = machines.findIndex(m => String(m.id) === String(op.machine_id));
+                        const mIdx2 = machines.findIndex(m => String(m.id) === String(next.machine_id));
 
-                      const y1 = mIdx1 * ROW_HEIGHT + ROW_HEIGHT / 2;
-                      const y2 = mIdx2 * ROW_HEIGHT + ROW_HEIGHT / 2;
+                        if (mIdx1 < 0 || mIdx2 < 0) return null;
 
-                      let d = "";
-                      if (mIdx1 === mIdx2) {
-                        d = `M ${x1} ${y1} L ${x2} ${y2}`;
-                      } else {
-                        // Intelligent pathing: mid-point elbow unless they are too close or overlapping
-                        const gap = x2 - x1;
-                        const turnX = gap > 10 ? x1 + gap / 2 : x1 + 5;
-                        d = `M ${x1} ${y1} L ${turnX} ${y1} L ${turnX} ${y2} L ${x2} ${y2}`;
-                      }
+                        const y1 = mIdx1 * ROW_HEIGHT + ROW_HEIGHT / 2;
+                        const y2 = mIdx2 * ROW_HEIGHT + ROW_HEIGHT / 2;
+
+                        let d = "";
+                        if (mIdx1 === mIdx2) {
+                          d = `M ${x1} ${y1} L ${x2} ${y2}`;
+                        } else {
+                          // Intelligent pathing: mid-point elbow unless they are too close or overlapping
+                          const gap = x2 - x1;
+                          const turnX = gap > 10 ? x1 + gap / 2 : x1 + 5;
+                          d = `M ${x1} ${y1} L ${turnX} ${y1} L ${turnX} ${y2} L ${x2} ${y2}`;
+                        }
+
+                        return (
+                          <path
+                            key={`link-${op.id}-${next.id}`}
+                            d={d}
+                            stroke="var(--accent)"
+                            strokeWidth="1"
+                            strokeDasharray="2,2"
+                            strokeOpacity="0.5"
+                            fill="none"
+                            markerEnd="url(#arrowhead)"
+                            style={{ transition: 'all 0.3s ease' }}
+                          />
+                        );
+                      })}
+                    </svg>
+                    {machines.map((machine, mIdx) => {
+                      const machineOps = operations.filter(op => String(op.machine_id) === String(machine.id));
+                      const machineMaint = maintenancePlans.filter(m => String(m.machine_id) === String(machine.id));
 
                       return (
-                        <path
-                          key={`link-${op.id}-${next.id}`}
-                          d={d}
-                          stroke="var(--accent)"
-                          strokeWidth="1"
-                          strokeDasharray="2,2"
-                          strokeOpacity="0.5"
-                          fill="none"
-                          markerEnd="url(#arrowhead)"
-                          style={{ transition: 'all 0.3s ease' }}
-                        />
-                      );
-                    })}
-                  </svg>
-                  {machines.map((machine, mIdx) => {
-                    const machineOps = operations.filter(op => String(op.machine_id) === String(machine.id));
-                    const machineMaint = maintenancePlans.filter(m => String(m.machine_id) === String(machine.id));
-
-                    return (
-                      <div key={machine.id} className={`flex border-b border-[var(--border-color)] h-[${ROW_HEIGHT}px] group transition-colors relative ${mIdx % 2 === 0 ? 'bg-white/[0.01]' : 'bg-black/[0.02]'}`} style={{ height: `${ROW_HEIGHT}px` }}>
-                        <div className={`w-[${SIDEBAR_WIDTH}px] border-r border-[var(--border-color)] shrink-0 px-4 sticky left-0 z-20 bg-[var(--bg-sidebar)] group-hover:bg-[var(--row-hover)] flex flex-col justify-center shadow-[4px_0_10px_rgba(0,0,0,0.2)]`} style={{ width: `${SIDEBAR_WIDTH}px` }}>
-                          <h4 className="font-black text-[10px] uppercase tracking-tighter text-[var(--text-main)] w-full mb-0.5 whitespace-nowrap truncate">{machine.name}</h4>
-                          <p className="text-[7px] text-indigo-500 font-black uppercase tracking-widest opacity-80 whitespace-nowrap truncate">{machine.work_center?.name || t('center_placeholder')}</p>
-                        </div>
-                        <div
-                          className="flex-1 relative"
-                          onDragOver={(e) => {
-                            e.preventDefault();
-                            if (!draggingOperation) return;
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            const x = e.clientX - rect.left;
-                            const msPerUnit = timeGrain === 'hours' ? 3600000 : timeGrain === 'weeks' ? 604800000 : 86400000;
-                            const units = x / pixelsPerUnit;
-                            const currentStart = new Date(viewRange.start.getTime() + units * msPerUnit);
-                            setDragPreview({
-                              id: draggingOperation.id,
-                              left: x,
-                              start: currentStart,
-                              machineId: machine.id
-                            });
-                          }}
-                          onDrop={(e) => {
-                            e.preventDefault();
-                            if (!draggingOperation) return;
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            const x = e.clientX - rect.left;
-                            const msPerUnit = timeGrain === 'hours' ? 3600000 : timeGrain === 'weeks' ? 604800000 : 86400000;
-                            const units = x / pixelsPerUnit;
-                            const newStartDate = new Date(viewRange.start.getTime() + units * msPerUnit);
-                            handleOperationDrop(draggingOperation, newStartDate, machine.id);
-                            setDraggingOperation(null);
-                            setDragPreview(null);
-                          }}
-                        >
-                          {/* Rendering Maintenance Blocks */}
-                          {machineMaint.map((m, mi) => {
-                            const left = getPos(m.start_date);
-                            const width = getWidth(m.start_date, m.end_date);
-                            return (
-                              <div
-                                key={`maint-${machine.id}-${mi}`}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedMaintenance(m);
-                                  setSelectedOperation(null);
-                                }}
-                                className="absolute h-[32px] border border-rose-500/50 rounded-lg flex items-center gap-2 px-3 z-10 bg-amber-500/20 backdrop-blur-[2px] overflow-hidden group/maint shadow-[inset_0_0_10px_rgba(245,158,11,0.1)] cursor-pointer hover:border-rose-500 transition-all active:scale-95"
-                                style={{
-                                  left: `${left + 1}px`,
-                                  width: `${width - 2}px`,
-                                  top: '4px',
-                                  background: 'repeating-linear-gradient(45deg, rgba(245, 158, 11, 0.1), rgba(245, 158, 11, 0.1) 10px, rgba(245, 158, 11, 0.2) 10px, rgba(245, 158, 11, 0.2) 20px)'
-                                }}
-                                title={`${t('maintenance_activity')}: ${m.description || ''}`}
-                              >
-                                <Activity size={10} className="text-rose-500 animate-pulse shrink-0" />
-                                <span className="text-[7px] font-black text-rose-500 uppercase tracking-widest whitespace-nowrap opacity-80">{t('maintenance_activity')}</span>
-                              </div>
-                            );
-                          })}
-
-                          {dragPreview && dragPreview.machineId === machine.id && draggingOperation && (
-                            <div
-                              className="absolute top-[4px] h-[32px] border-2 border-dashed border-indigo-400 bg-indigo-400/20 rounded-xl z-50 pointer-events-none flex flex-col justify-center px-4 shadow-[0_0_20px_rgba(129,140,248,0.3)]"
-                              style={{ left: `${dragPreview.left}px`, width: `${getWidth(draggingOperation.start_date, draggingOperation.end_date)}px` }}
-                            >
-                              <span className="text-[8px] font-black text-white uppercase tracking-tighter">{dragPreview.start.toLocaleTimeString(language === 'es' ? 'es-AR' : 'en-US', { hour: '2-digit', minute: '2-digit' })}</span>
-                            </div>
-                          )}
-                          {machineOps.map((op) => {
-                            const left = getPos(op.start_date);
-                            const width = getWidth(op.start_date, op.end_date);
-                            const idNum = parseInt(op.work_order_id.replace(/\D/g, '')) || 0;
-                            const colors = WO_COLORS[idNum % WO_COLORS.length];
-                            const actionColor = op.suggestion?.action_type === 'advance' ? 'border-emerald-500' : op.suggestion?.action_type === 'delay' ? 'border-amber-500' : 'border-indigo-500/50';
-
-                            return (
-                              <div
-                                key={`${machine.id}-${op.id}-${op.operation_sequence}`}
-                                onClick={() => setSelectedOperation(op)}
-                                draggable
-                                onDragStart={(e) => {
-                                  setDraggingOperation(op);
-                                  const img = new Image();
-                                  img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-                                  e.dataTransfer.setDragImage(img, 0, 0);
-                                  e.dataTransfer.effectAllowed = "move";
-                                }}
-                                className={`absolute h-[32px] border rounded-lg px-2 py-0.5 flex flex-col justify-between cursor-pointer transition-all hover:z-40 hover:brightness-110 active:scale-95 shadow-sm overflow-hidden ${colors.bg} ${actionColor}`}
-                                style={{
-                                  left: `${left + 1}px`,
-                                  width: `${width - 2}px`,
-                                  minWidth: '40px',
-                                  top: '4px'
-                                }}
-                              >
-                                <div className="flex justify-between items-center gap-1">
-                                  <span className={`text-[8px] font-black leading-none truncate ${colors.text}`}>
-                                    {op.work_order_id}
-                                  </span>
-                                  {op.suggestion?.action_type && op.suggestion.action_type !== 'new' && (
-                                    <div className={`text-[5px] font-black px-1 rounded-full uppercase shrink-0 ${op.suggestion.action_type === 'advance' ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}`}>
-                                      {op.suggestion.action_type.substring(0, 3)}
-                                    </div>
-                                  )}
+                        // Row: only the grid area (label is now in the fixed sidebar panel on the left)
+                        <div key={machine.id} className={`border-b border-[var(--border-color)] transition-colors relative ${mIdx % 2 === 0 ? 'bg-white/[0.01]' : 'bg-black/[0.02]'}`} style={{ height: `${ROW_HEIGHT}px`, width: '100%' }}>
+                          <div
+                            className="absolute inset-0"
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              if (!draggingOperation) return;
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              const x = e.clientX - rect.left;
+                              const msPerUnit = timeGrain === 'hours' ? 3600000 : timeGrain === 'weeks' ? 604800000 : 86400000;
+                              const units = x / pixelsPerUnit;
+                              const currentStart = new Date(viewRange.start.getTime() + units * msPerUnit);
+                              setDragPreview({
+                                id: draggingOperation.id,
+                                left: x,
+                                start: currentStart,
+                                machineId: machine.id
+                              });
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              if (!draggingOperation) return;
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              const x = e.clientX - rect.left;
+                              const msPerUnit = timeGrain === 'hours' ? 3600000 : timeGrain === 'weeks' ? 604800000 : 86400000;
+                              const units = x / pixelsPerUnit;
+                              const newStartDate = new Date(viewRange.start.getTime() + units * msPerUnit);
+                              handleOperationDrop(draggingOperation, newStartDate, machine.id);
+                              setDraggingOperation(null);
+                              setDragPreview(null);
+                            }}
+                          >
+                            {/* Rendering Maintenance Blocks */}
+                            {machineMaint.map((m, mi) => {
+                              const left = getPos(m.start_date);
+                              const width = getWidth(m.start_date, m.end_date);
+                              return (
+                                <div
+                                  key={`maint-${machine.id}-${mi}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedMaintenance(m);
+                                    setSelectedOperation(null);
+                                  }}
+                                  className="absolute h-[32px] border border-rose-500/50 rounded-lg flex items-center gap-2 px-3 z-10 bg-amber-500/20 backdrop-blur-[2px] overflow-hidden group/maint shadow-[inset_0_0_10px_rgba(245,158,11,0.1)] cursor-pointer hover:border-rose-500 transition-all active:scale-95"
+                                  style={{
+                                    left: `${left + 1}px`,
+                                    width: `${width - 2}px`,
+                                    top: '4px',
+                                    background: 'repeating-linear-gradient(45deg, rgba(245, 158, 11, 0.1), rgba(245, 158, 11, 0.1) 10px, rgba(245, 158, 11, 0.2) 10px, rgba(245, 158, 11, 0.2) 20px)'
+                                  }}
+                                  title={`${t('maintenance_activity')}: ${m.description || ''}`}
+                                >
+                                  <Activity size={10} className="text-rose-500 animate-pulse shrink-0" />
+                                  <span className="text-[7px] font-black text-rose-500 uppercase tracking-widest whitespace-nowrap opacity-80">{t('maintenance_activity')}</span>
                                 </div>
+                              );
+                            })}
 
-                                <p className={`text-[7px] font-bold truncate leading-tight opacity-90 ${colors.text}`}>
-                                  {op.item?.name || t('item')}
-                                </p>
+                            {dragPreview && dragPreview.machineId === machine.id && draggingOperation && (
+                              <div
+                                className="absolute top-[4px] h-[32px] border-2 border-dashed border-indigo-400 bg-indigo-400/20 rounded-xl z-50 pointer-events-none flex flex-col justify-center px-4 shadow-[0_0_20px_rgba(129,140,248,0.3)]"
+                                style={{ left: `${dragPreview.left}px`, width: `${getWidth(draggingOperation.start_date, draggingOperation.end_date)}px` }}
+                              >
+                                <span className="text-[8px] font-black text-white uppercase tracking-tighter">{dragPreview.start.toLocaleTimeString(language === 'es' ? 'es-AR' : 'en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                              </div>
+                            )}
+                            {machineOps.map((op) => {
+                              const left = getPos(op.start_date);
+                              const width = getWidth(op.start_date, op.end_date);
+                              const idNum = parseInt(op.work_order_id.replace(/\D/g, '')) || 0;
+                              const colors = WO_COLORS[idNum % WO_COLORS.length];
+                              const actionColor = op.suggestion?.action_type === 'advance' ? 'border-emerald-500' : op.suggestion?.action_type === 'delay' ? 'border-amber-500' : 'border-indigo-500/50';
 
-                                <div className="flex justify-between items-center mt-auto border-t border-white/10 pt-0.5">
-                                  <div className="flex items-center gap-1">
-                                    <span className={`text-[6px] font-black uppercase tracking-tighter ${colors.text}`}>S{op.operation_sequence}</span>
-                                    {operations.some(o => o.work_order_id === op.work_order_id && o.operation_sequence === op.operation_sequence && o.id !== op.id) && (
-                                      <RefreshCw size={6} className={colors.text} />
+                              return (
+                                <div
+                                  key={`${machine.id}-${op.id}-${op.operation_sequence}`}
+                                  onClick={() => setSelectedOperation(op)}
+                                  draggable
+                                  onDragStart={(e) => {
+                                    setDraggingOperation(op);
+                                    const img = new Image();
+                                    img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+                                    e.dataTransfer.setDragImage(img, 0, 0);
+                                    e.dataTransfer.effectAllowed = "move";
+                                  }}
+                                  className={`absolute h-[32px] border rounded-lg px-2 py-0.5 flex flex-col justify-between cursor-pointer transition-all hover:z-40 hover:brightness-110 active:scale-95 shadow-sm overflow-hidden ${colors.bg} ${actionColor}`}
+                                  style={{
+                                    left: `${left + 1}px`,
+                                    width: `${width - 2}px`,
+                                    minWidth: '40px',
+                                    top: '4px'
+                                  }}
+                                >
+                                  <div className="flex justify-between items-center gap-1">
+                                    <span className={`text-[8px] font-black leading-none truncate ${colors.text}`}>
+                                      {op.work_order_id}
+                                    </span>
+                                    {op.suggestion?.action_type && op.suggestion.action_type !== 'new' && (
+                                      <div className={`text-[5px] font-black px-1 rounded-full uppercase shrink-0 ${op.suggestion.action_type === 'advance' ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}`}>
+                                        {op.suggestion.action_type.substring(0, 3)}
+                                      </div>
                                     )}
                                   </div>
-                                  <span className={`text-[6px] font-black ${colors.text} opacity-70`}>{op.quantity}U</span>
+
+                                  <p className={`text-[7px] font-bold truncate leading-tight opacity-90 ${colors.text}`}>
+                                    {op.item?.name || t('item')}
+                                  </p>
+
+                                  <div className="flex justify-between items-center mt-auto border-t border-white/10 pt-0.5">
+                                    <div className="flex items-center gap-1">
+                                      <span className={`text-[6px] font-black uppercase tracking-tighter ${colors.text}`}>S{op.operation_sequence}</span>
+                                      {operations.some(o => o.work_order_id === op.work_order_id && o.operation_sequence === op.operation_sequence && o.id !== op.id) && (
+                                        <RefreshCw size={6} className={colors.text} />
+                                      )}
+                                    </div>
+                                    <span className={`text-[6px] font-black ${colors.text} opacity-70`}>{op.quantity}U</span>
+                                  </div>
                                 </div>
-                              </div>
-                            );
-                          })}
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                  <div className="absolute top-0 bottom-0 w-px bg-rose-500 shadow-[0_0_15px_red] z-40 pointer-events-none" style={{ left: `${getPos(new Date().toISOString()) + SIDEBAR_WIDTH}px` }}>
-                    <div className="bg-rose-500 text-[8px] font-black text-white px-2 py-0.5 rounded-full absolute -top-3 -translate-x-1/2 whitespace-nowrap">{t('now')}</div>
+                      );
+                    })}
+                    {/* "Now" line — no SIDEBAR_WIDTH offset since SVG starts at x=0 of the grid */}
+                    <div className="absolute top-0 bottom-0 w-px bg-rose-500 shadow-[0_0_15px_red] z-40 pointer-events-none" style={{ left: `${getPos(new Date().toISOString())}px` }}>
+                      <div className="bg-rose-500 text-[8px] font-black text-white px-2 py-0.5 rounded-full absolute -top-3 -translate-x-1/2 whitespace-nowrap">{t('now')}</div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                </div> {/* end scrollable gantt grid */}
+              </div> {/* end flex-1 flex (body panel) */}
               {/* Barra de desplazamiento auxiliar al pie - Ahora más ancha y con color diferenciado */}
               {!showStockFlow && (
                 <div
@@ -877,7 +912,7 @@ const SchedulePage: React.FC = () => {
                   ref={footerScrollRef}
                   onScroll={(e) => syncScroll(e, scrollContainerRef, headerScrollRef)}
                 >
-                  <div style={{ width: `${viewRange.days * pixelsPerUnit + SIDEBAR_WIDTH}px`, height: '1px' }}></div>
+                  <div style={{ width: `${viewRange.days * pixelsPerUnit}px`, height: '1px' }}></div>
                 </div>
               )}
             </div>

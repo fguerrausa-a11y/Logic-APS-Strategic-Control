@@ -1657,7 +1657,7 @@ const DataExplorer: React.FC = () => {
                                                             {col === 'is_fixed' ? t('reprogrammable') : (t(col as any) !== col ? t(col as any) : col.replace(/_/g, ' '))}
                                                         </th>
                                                     ))}
-                                                    {activeTab === 'inputs' && <th className="px-6 py-4 text-[10px] font-black text-indigo-400 uppercase tracking-widest bg-[var(--bg-sidebar)] text-right">Acciones</th>}
+                                                    {activeTab === 'inputs' && <th className="px-6 py-4 text-[10px] font-black text-indigo-400 uppercase tracking-widest bg-[var(--bg-sidebar)] text-right">{t('actions')}</th>}
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-[var(--border-color)]/50">

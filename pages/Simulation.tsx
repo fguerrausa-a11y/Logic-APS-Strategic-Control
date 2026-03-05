@@ -149,6 +149,11 @@ const OrderSelectionModal: React.FC<OrderSelectionModalProps> = ({ isOpen, onClo
   );
 };
 
+/** Unified saturation threshold (%).
+ *  A work center is considered "saturated" when its load percentage exceeds this value.
+ *  Used by BOTH the left sidebar cards AND the right work-center load cards — keep in sync. */
+const SATURATION_THRESHOLD = 85; // %
+
 const SimulationPage: React.FC = () => {
   const { t, language } = useTranslation();
   const navigate = useNavigate();
@@ -158,6 +163,7 @@ const SimulationPage: React.FC = () => {
   const [isExecuting, setIsExecuting] = useState(false);
   const [workCenters, setWorkCenters] = useState<any[]>([]);
   const [bottlenecks, setBottlenecks] = useState<string[]>([]);
+  const [bottleneckData, setBottleneckData] = useState<any[]>([]); // Full motor data: {work_center_id, utilization_ratio, is_ccr, load_minutes, capacity_minutes}
   const [proposedOrders, setProposedOrders] = useState<{ pwos: any[], ppos: any[] }>({ pwos: [], ppos: [] });
   const [proposedOperations, setProposedOperations] = useState<any[]>([]);
   const [loadingProposed, setLoadingProposed] = useState(false);
@@ -166,6 +172,7 @@ const SimulationPage: React.FC = () => {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('theme') as 'light' | 'dark') || 'light');
 
   const [virtualMachines, setVirtualMachines] = useState<Record<string, number>>({});
+  const [scenarioMachinesData, setScenarioMachinesData] = useState<any[]>([]);  // ← fuente de verdad para wcLoadMap
   const [includeMaintenance, setIncludeMaintenance] = useState(true);
   const [overlapEnabled, setOverlapEnabled] = useState(false);
   const [wcSplitConfigs, setWcSplitConfigs] = useState<Record<string, { enabled: boolean, maxSplit: number }>>({});
@@ -230,6 +237,7 @@ const SimulationPage: React.FC = () => {
     setLoadingProposed(true);
     setProposedOrders({ pwos: [], ppos: [] });
     setProposedOperations([]);
+    setScenarioMachinesData([]);
 
     try {
       // Use overrides if present, otherwise fallback to defaults (real capacity)
@@ -271,16 +279,32 @@ const SimulationPage: React.FC = () => {
       setProposedOperations(ops || []);
 
       const { data: scenarioMachines } = await supabase.from('machines').select('id, work_center_id, shift:shifts(*)');
-      (scenario as any).machines_data = scenarioMachines;
+      setScenarioMachinesData(scenarioMachines || []);   // ← setState en lugar de mutación directa
 
-      const redWCs = new Set<string>();
-      const redPWOs = (pwosRes.data || []).filter(p => p.severity === 'red' && p.delay_reason?.toLowerCase().includes('satur'));
-      if (redPWOs.length > 0 && ops) {
-        redPWOs.forEach(rp => {
-          ops.filter(o => o.work_order_id === rp.work_order_id).forEach(o => redWCs.add(o.work_center_id));
-        });
+      // Use bottlenecks persisted by the APS motor (utilization_ratio-based, accurate)
+      // Fallback to the old heuristic only if data pre-dates this improvement
+      const motorBottlenecks: any[] = scenario.simulation_overrides?.last_bottlenecks || [];
+      if (motorBottlenecks.length > 0) {
+        // Motor result contains ALL work centers with load, ordered by utilization_ratio.
+        // Only mark as "saturated" (red) those with ratio > SATURATION_THRESHOLD/100.
+        // This MUST match the isHighLoad threshold used in the work center load cards below.
+        const saturatedWCs = motorBottlenecks
+          .filter((b: any) => b.utilization_ratio * 100 > SATURATION_THRESHOLD)
+          .map((b: any) => b.work_center_id);
+        setBottlenecks(saturatedWCs);
+        setBottleneckData(motorBottlenecks); // All WCs with load, for showing utilization %
+      } else {
+        // Legacy fallback: heuristic detection via red PWOs with saturation reason
+        const redWCs = new Set<string>();
+        const redPWOs = (pwosRes.data || []).filter(p => p.severity === 'red' && p.delay_reason?.toLowerCase().includes('satur'));
+        if (redPWOs.length > 0 && ops) {
+          redPWOs.forEach(rp => {
+            ops.filter(o => o.work_order_id === rp.work_order_id).forEach(o => redWCs.add(o.work_center_id));
+          });
+        }
+        setBottlenecks(Array.from(redWCs));
+        setBottleneckData([]);
       }
-      setBottlenecks(Array.from(redWCs));
     } catch (err) {
       console.error("APS Error:", err);
     } finally {
@@ -354,6 +378,48 @@ const SimulationPage: React.FC = () => {
     setWcSplitConfigs({});
     setIncludeMaintenance(true);
   };
+
+  // ─────────────────────────────────────────────────────────────────────
+  // SINGLE SOURCE OF TRUTH: WC load percentages
+  // Computed from actual proposedOperations vs real machine capacity.
+  // Both the left sidebar AND the right load cards read from this map.
+  // ─────────────────────────────────────────────────────────────────────
+  const wcLoadMap = React.useMemo(() => {
+    const map: Record<string, { loadPct: number; loadMinutes: number; capacityMinutes: number; machineCount: number }> = {};
+    const dtFrom = new Date(filters.fromDate || new Date());
+    const dtTo = new Date(filters.toDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
+    const horizonDays = Math.max(1, Math.round((dtTo.getTime() - dtFrom.getTime()) / 86400000));
+
+    workCenters.forEach(wc => {
+      const wcOps = proposedOperations.filter(op => op.work_center_id === wc.id);
+      const loadMinutes = wcOps.reduce((acc, op) => acc + (op.run_time_minutes || 0) + (op.setup_time_minutes || 0), 0);
+
+      const wcMachines: any[] = scenarioMachinesData.filter((m: any) => m.work_center_id === wc.id);
+      const machineCount = virtualMachines[wc.id] || wcMachines.length || 1;
+
+      // Per-machine capacity: use shift hours if available, otherwise 8h/day × 5d/week
+      const perMachineCapacity = (m: any): number => {
+        const shift = m?.shift;
+        if (!shift) return 8 * 60 * horizonDays * (5 / 7); // default 8h × 5/7 working days
+        const [sh, sm] = (shift.start_time || '08:00').split(':').map(Number);
+        const [eh, em] = (shift.end_time || '16:00').split(':').map(Number);
+        const hoursPerDay = Math.max(0, (eh * 60 + em - (sh * 60 + sm)) / 60);
+        const daysPerWeek = shift.days_of_week?.length ?? 5;
+        return hoursPerDay * 60 * horizonDays * (daysPerWeek / 7);
+      };
+
+      const totalCapacityMinutes = wcMachines.length > 0
+        ? wcMachines.reduce((acc, m) => acc + perMachineCapacity(m), 0) / wcMachines.length * machineCount
+        : 8 * 60 * horizonDays * (5 / 7) * machineCount;
+
+      const loadPct = totalCapacityMinutes > 0
+        ? Math.round((loadMinutes / totalCapacityMinutes) * 100)
+        : 0;
+
+      map[wc.id] = { loadPct, loadMinutes, capacityMinutes: Math.round(totalCapacityMinutes), machineCount };
+    });
+    return map;
+  }, [workCenters, proposedOperations, scenarioMachinesData, virtualMachines, filters.fromDate, filters.toDate]);
 
   return (
     <div className="flex h-full overflow-hidden bg-[var(--bg-main)] text-[var(--text-main)] transition-colors">
@@ -430,13 +496,33 @@ const SimulationPage: React.FC = () => {
               </div>
               <div className="space-y-3">
                 {workCenters.map(wc => {
-                  const isSaturated = bottlenecks.includes(wc.id);
+                  const wcLoad = wcLoadMap[wc.id];
+                  const utilizationPct = wcLoad?.loadPct ?? 0;
+                  const isSaturated = utilizationPct > SATURATION_THRESHOLD;
+                  const isDanger = utilizationPct > 70 && !isSaturated;
+                  // is_ccr comes from the motor's bottleneckData (structural info, not load %)
+                  const isCCR = bottleneckData.find((b: any) => b.work_center_id === wc.id)?.is_ccr === true;
                   return (
-                    <div key={wc.id} className={`flex flex-col p-4 rounded-2xl border transition-all duration-500 gap-3 ${isSaturated ? 'bg-rose-500/10 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.2)]' : 'bg-[var(--bg-card)] border-[var(--border-color)] shadow-sm'}`}>
+                    <div key={wc.id} className={`flex flex-col p-4 rounded-2xl border transition-all duration-500 gap-3 ${isSaturated
+                      ? 'bg-rose-500/10 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.2)]'
+                      : isDanger
+                        ? 'bg-amber-500/8 border-amber-500/40'
+                        : 'bg-[var(--bg-card)] border-[var(--border-color)] shadow-sm'
+                      }`}>
                       <div className="flex justify-between items-center">
                         <div className="flex-1 min-w-0 pr-2">
-                          <span className={`text-xs font-black uppercase tracking-tighter truncate block ${isSaturated ? 'text-rose-500' : ''}`}>{wc.name}</span>
-                          <p className="text-[8px] font-bold text-[var(--text-muted)] mt-0.5 uppercase">{t('machines')}</p>
+                          <span className={`text-xs font-black uppercase tracking-tighter truncate block ${isSaturated ? 'text-rose-500' : isDanger ? 'text-amber-500' : ''}`}>
+                            {wc.name}
+                            {isCCR && <span className="ml-1.5 text-[8px] font-black bg-rose-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-widest">CCR</span>}
+                          </span>
+                          <p className="text-[8px] font-bold text-[var(--text-muted)] mt-0.5 uppercase flex items-center gap-1.5">
+                            {t('machines')}
+                            {wcLoad && (
+                              <span className={`font-black ${utilizationPct > SATURATION_THRESHOLD ? 'text-rose-500' : utilizationPct > 70 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                                · {utilizationPct}% util.
+                              </span>
+                            )}
+                          </p>
                         </div>
                         <div className="flex items-center gap-1 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl p-1 shrink-0 scale-90">
                           <button onClick={() => setVirtualMachines(v => ({ ...v, [wc.id]: Math.max(0, (v[wc.id] || 0) - 1) }))} className="w-6 h-6 rounded-lg bg-[var(--bg-card)] hover:border-indigo-500/30 border border-transparent font-black text-xs transition-all">-</button>
@@ -506,36 +592,25 @@ const SimulationPage: React.FC = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {workCenters.map(wc => {
-                      const wcOps = proposedOperations.filter(op => op.work_center_id === wc.id);
-                      const totalRunTime = wcOps.reduce((acc, op) => acc + (op.run_time_minutes || 0) + (op.setup_time_minutes || 0), 0);
+                      // Read from the shared wcLoadMap — same data as the left sidebar
+                      const wcLoad = wcLoadMap[wc.id];
+                      const totalRunTime = wcLoad?.loadMinutes ?? 0;
+                      const totalCapacityMinutes = wcLoad?.capacityMinutes ?? 0;
+                      const machineCount = wcLoad?.machineCount ?? (virtualMachines[wc.id] || 1);
+                      const realLoadPercentage = wcLoad?.loadPct ?? 0;
+                      const loadBarWidth = Math.min(100, realLoadPercentage);
+                      const isHighLoad = realLoadPercentage > SATURATION_THRESHOLD;
+                      const isDanger = realLoadPercentage > 70 && !isHighLoad; // 70–85%: warning zone
 
-                      // Get all machines for this WC to calculate shift-based capacity
-                      const wcMachines = (activeScenario as any)?.machines_data?.filter((m: any) => m.work_center_id === wc.id) || [];
-                      const machineCount = virtualMachines[wc.id] || wcMachines.length || 1;
-
-                      // Average hours from machines in this WC, or default to 8
-                      const avgDailyHours = wcMachines.length > 0
-                        ? wcMachines.reduce((acc: number, m: any) => acc + (m.shift?.daily_capacity_hours || 8), 0) / wcMachines.length
-                        : 8;
-                      // Use dynamic horizon based on filters
+                      // Date range for display only
                       const dtFrom = new Date(filters.fromDate || new Date());
                       const dtTo = new Date(filters.toDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
 
-                      // Capacity = (Average Individual Capacity) * Machine Count
-                      const avgIndividualCapacity = wcMachines.length > 0
-                        ? wcMachines.reduce((acc: number, m: any) => acc + calculateCapacityForPeriod(dtFrom, dtTo, m), 0) / wcMachines.length
-                        : 8 * 60 * calculateWorkingDays(dtFrom, dtTo);
-
-                      const totalCapacityMinutes = avgIndividualCapacity * machineCount;
-                      const realLoadPercentage = Math.round((totalRunTime / totalCapacityMinutes) * 100);
-                      const loadBarWidth = Math.min(100, isNaN(realLoadPercentage) ? 0 : realLoadPercentage);
-                      const isHighLoad = realLoadPercentage > 85;
-
                       return (
                         <div key={wc.id} className="bg-[var(--bg-sidebar)] p-5 rounded-3xl border border-[var(--border-color)] group hover:border-indigo-500/40 transition-all shadow-lg relative overflow-hidden">
-                          {isHighLoad && (
+                          {(isHighLoad || isDanger) && (
                             <div className="absolute top-0 right-0 p-2">
-                              <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shadow-[0_0_10px_rgba(244,63,94,0.8)]"></div>
+                              <div className={`w-2 h-2 rounded-full animate-pulse ${isHighLoad ? 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.8)]' : 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.8)]'}`}></div>
                             </div>
                           )}
 
@@ -551,20 +626,25 @@ const SimulationPage: React.FC = () => {
                                   {dtFrom.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} - {dtTo.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
                                 </p>
                               </div>
-                              <span className={`text-lg font-black ${isHighLoad ? 'text-rose-500' : 'text-indigo-500'}`}>{isNaN(realLoadPercentage) ? 0 : realLoadPercentage}%</span>
+                              <span className={`text-lg font-black ${isHighLoad ? 'text-rose-500' : isDanger ? 'text-amber-500' : 'text-emerald-500'}`}>
+                                {isNaN(realLoadPercentage) ? 0 : realLoadPercentage}%
+                              </span>
                             </div>
 
                             <div className="h-3 bg-[var(--bg-main)] rounded-full overflow-hidden border border-[var(--border-color)]">
                               <div
-                                className={`h-full transition-all duration-1000 ease-out rounded-full ${isHighLoad ? 'bg-gradient-to-r from-rose-600 to-rose-400' : 'bg-gradient-to-r from-indigo-600 to-indigo-400'}`}
+                                className={`h-full transition-all duration-1000 ease-out rounded-full ${isHighLoad ? 'bg-gradient-to-r from-rose-600 to-rose-400'
+                                  : isDanger ? 'bg-gradient-to-r from-amber-500 to-amber-400'
+                                    : 'bg-gradient-to-r from-emerald-600 to-emerald-400'
+                                  }`}
                                 style={{ width: `${loadBarWidth}%` }}
                               ></div>
                             </div>
 
                             <div className="flex justify-between text-[9px] font-black uppercase tracking-widest">
                               <span className="text-[var(--text-muted)]">{t('load')}: {Math.round(totalRunTime / 60)}h / {Math.round(totalCapacityMinutes / 60)}h</span>
-                              <span className={isHighLoad ? 'text-rose-500 animate-pulse' : 'text-emerald-500'}>
-                                {isHighLoad ? t('saturated') : t('operational')}
+                              <span className={isHighLoad ? 'text-rose-500 animate-pulse' : isDanger ? 'text-amber-500' : 'text-emerald-500'}>
+                                {isHighLoad ? t('saturated') : isDanger ? t('warning') || 'Precaución' : t('operational')}
                               </span>
                             </div>
                           </div>
