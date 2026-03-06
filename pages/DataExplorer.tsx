@@ -34,7 +34,8 @@ import {
     AlertTriangle,
     Factory,
     ShoppingBag,
-    Layers
+    Layers,
+    Check
 } from 'lucide-react';
 
 // ─── Toast Notification System ──────────────────────────────────────────────
@@ -670,33 +671,95 @@ const MachineMasterModal: React.FC<{ isOpen: boolean; onClose: () => void; machi
 };
 
 // --- Sub-Tabla para BOM ---
-const BOMSubTable: React.FC<{ parentId: string, bom: any[], items: any[], onItemClick: (id: string) => void }> = ({ parentId, bom, items, onItemClick }) => {
+const BOMSubTable: React.FC<{ parentId: string, bom: any[], items: any[], onItemClick: (id: string) => void, onUpdate?: () => void }> = ({ parentId, bom, items, onItemClick, onUpdate }) => {
     const { t } = useTranslation();
+    const [isAdding, setIsAdding] = useState(false);
+    const [newItemId, setNewItemId] = useState('');
+    const [newQty, setNewQty] = useState(1);
+    const [loading, setLoading] = useState(false);
+
     const children = bom.filter(b => b.parent_item_id === parentId);
+
+    const handleAdd = async () => {
+        if (!newItemId) return;
+        setLoading(true);
+        try {
+            await supabase.from('bom').insert([{ parent_item_id: parentId, component_item_id: newItemId, quantity_required: newQty }]);
+            setIsAdding(false);
+            setNewItemId('');
+            setNewQty(1);
+            if (onUpdate) onUpdate();
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleRemove = async (componentId: string) => {
+        try {
+            await supabase.from('bom').delete().eq('parent_item_id', parentId).eq('component_item_id', componentId);
+            if (onUpdate) onUpdate();
+        } catch (e) { console.error(e); }
+    };
+
     return (
         <div className="bg-[var(--bg-sidebar)] p-4 border-l-4 border-indigo-500/50 m-2 rounded-r-xl">
-            <h5 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-3">{t('formula_components')}</h5>
+            <div className="flex items-center justify-between mb-3">
+                <h5 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{t('formula_components')}</h5>
+                {onUpdate && (
+                    <button onClick={() => setIsAdding(!isAdding)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[9px] font-black uppercase tracking-widest hover:bg-indigo-500/20 transition-all">
+                        <Plus size={10} /> Componente
+                    </button>
+                )}
+            </div>
             <table className="w-full text-xs">
                 <thead>
                     <tr className="text-[var(--text-muted)] border-b border-[var(--border-color)]">
                         <th className="px-4 py-2 text-left">{t('component')}</th>
                         <th className="px-4 py-2 text-right">{t('required_qty')}</th>
+                        {onUpdate && <th className="px-2 py-2 w-10"></th>}
                     </tr>
                 </thead>
                 <tbody>
                     {children.map((c, i) => {
                         const item = items.find(it => it.id === c.component_item_id);
                         return (
-                            <tr key={i} className="border-b border-[var(--border-color)] hover:bg-[var(--accent)]/5 transition-colors cursor-pointer" onClick={() => onItemClick(c.component_item_id)}>
-                                <td className="px-4 py-2 text-[var(--text-main)] font-medium flex items-center gap-2">
+                            <tr key={i} className="border-b border-[var(--border-color)] hover:bg-[var(--accent)]/5 transition-colors group">
+                                <td className="px-4 py-2 text-[var(--text-main)] font-medium flex items-center gap-2 cursor-pointer" onClick={() => onItemClick(c.component_item_id)}>
                                     <Package size={12} className="text-indigo-500" />
                                     <span className="underline decoration-[var(--border-color)] underline-offset-4 group-hover:decoration-indigo-500">{item?.name || c.component_item_id}</span>
                                 </td>
                                 <td className="px-4 py-2 text-right text-indigo-400 font-bold">{c.quantity_required}</td>
+                                {onUpdate && (
+                                    <td className="px-2 py-2 text-right">
+                                        <button onClick={(e) => { e.stopPropagation(); handleRemove(c.component_item_id); }} className="text-rose-500/0 group-hover:text-rose-400 hover:bg-rose-500/10 p-1.5 rounded-md transition-all">
+                                            <Trash2 size={12} />
+                                        </button>
+                                    </td>
+                                )}
                             </tr>
                         );
                     })}
-                    {children.length === 0 && <tr><td colSpan={2} className="px-4 py-4 text-center text-[var(--text-muted)] italic">{t('no_components')}</td></tr>}
+                    {isAdding && (
+                        <tr className="bg-indigo-500/5 border-l-[3px] border-l-indigo-400">
+                            <td className="px-4 py-2">
+                                <select value={newItemId} onChange={e => setNewItemId(e.target.value)} className="w-full bg-[var(--bg-input)] border border-indigo-400 rounded-lg px-2 py-1 outline-none focus:ring-2 disabled:opacity-50 text-[var(--text-main)]">
+                                    <option value="">Seleccionar Componente...</option>
+                                    {items.filter(i => i.id !== parentId && !children.find(c => c.component_item_id === i.id)).map(i => (
+                                        <option key={i.id} value={i.id}>{i.name || i.id}</option>
+                                    ))}
+                                </select>
+                            </td>
+                            <td className="px-4 py-2">
+                                <input type="number" value={newQty} min="0.001" step="any" onChange={e => setNewQty(Number(e.target.value))} className="w-full text-right bg-[var(--bg-input)] border border-indigo-400 rounded-lg px-2 py-1 outline-none text-indigo-400 font-bold" />
+                            </td>
+                            <td className="px-2 py-2 text-right">
+                                <button onClick={handleAdd} disabled={!newItemId || loading} className="p-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 rounded-md disabled:opacity-50"><Check size={14} /></button>
+                            </td>
+                        </tr>
+                    )}
+                    {(children.length === 0 && !isAdding) && <tr><td colSpan={onUpdate ? 3 : 2} className="px-4 py-4 text-center text-[var(--text-muted)] italic">{t('no_components')}</td></tr>}
                 </tbody>
             </table>
         </div>
@@ -808,23 +871,75 @@ const OrderDetailsSubTable: React.FC<{ order: any, bom: any[], items: any[], rou
 };
 
 // --- Sub-Tabla para Detalle de Turno ---
-const ShiftDetailsSubTable: React.FC<{ shiftId: string, machines: any[], onMachineClick: (m: any) => void }> = ({ shiftId, machines, onMachineClick }) => {
+const ShiftDetailsSubTable: React.FC<{ shiftId: string, machines: any[], onMachineClick: (m: any) => void, onUpdate?: () => void }> = ({ shiftId, machines, onMachineClick, onUpdate }) => {
     const { t } = useTranslation();
+    const [isAdding, setIsAdding] = useState(false);
+    const [machineId, setMachineId] = useState('');
+    const [loading, setLoading] = useState(false);
+
     const shiftMachines = machines.filter(m => m.shift_id === shiftId);
+
+    const handleAssign = async () => {
+        if (!machineId) return;
+        setLoading(true);
+        try {
+            await supabase.from('machines').update({ shift_id: shiftId }).eq('id', machineId);
+            setIsAdding(false);
+            setMachineId('');
+            if (onUpdate) onUpdate();
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleUnassign = async (mId: string) => {
+        try {
+            await supabase.from('machines').update({ shift_id: null }).eq('id', mId);
+            if (onUpdate) onUpdate();
+        } catch (e) { console.error(e); }
+    };
+
     return (
-        <div className="bg-[var(--bg-sidebar)] p-4 border-l-4 border-cyan-500/50 m-2 rounded-r-xl">
-            <h5 className="text-[10px] font-black text-cyan-400 uppercase tracking-widest mb-3">{t('machines_with_shift')}</h5>
-            <div className="flex flex-wrap gap-2">
+        <div className="bg-[var(--bg-sidebar)] p-5 border-l-4 border-cyan-500/50 my-3 mx-4 rounded-xl shadow-sm w-full whitespace-normal overflow-hidden max-w-full">
+            <div className="flex items-center justify-between mb-4">
+                <h5 className="text-[10px] font-black text-cyan-400 uppercase tracking-widest">{t('machines_with_shift')}</h5>
+                {onUpdate && (
+                    <button onClick={() => setIsAdding(!isAdding)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-[9px] font-black uppercase tracking-widest hover:bg-cyan-500/20 transition-all shrink-0">
+                        <Plus size={10} /> Máquina
+                    </button>
+                )}
+            </div>
+            {isAdding && (
+                <div className="mb-4 flex flex-col sm:flex-row gap-2 items-start sm:items-center bg-cyan-500/5 border-l-[3px] border-l-cyan-400 p-2 rounded-md">
+                    <select value={machineId} onChange={e => setMachineId(e.target.value)} className="w-full sm:flex-1 bg-[var(--bg-input)] border border-cyan-400 rounded-lg px-2 py-1.5 outline-none focus:ring-2 disabled:opacity-50 text-[var(--text-main)] text-xs">
+                        <option value="">Seleccionar Equipo (sin turno actual)...</option>
+                        {machines.filter(m => m.shift_id !== shiftId).map(m => (
+                            <option key={m.id} value={m.id}>{m.name || m.id} {m.shift_id ? `(Asignada a otro turno)` : ''}</option>
+                        ))}
+                    </select>
+                    <button onClick={handleAssign} disabled={!machineId || loading} className="w-full sm:w-auto p-1.5 px-4 text-xs font-bold bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 rounded-md disabled:opacity-50 shrink-0">ASIGNAR</button>
+                </div>
+            )}
+            <div className="flex flex-wrap gap-2 w-full">
                 {shiftMachines.map(m => (
                     <div
                         key={m.id}
-                        className="flex items-center gap-2 bg-[var(--bg-main)] border border-[var(--border-color)] px-3 py-2 rounded-xl text-xs text-[var(--text-main)] cursor-pointer hover:border-cyan-500 hover:text-cyan-400 transition-all"
-                        onClick={() => onMachineClick(m)}
+                        className="flex items-center gap-2 bg-[var(--bg-main)] border border-[var(--border-color)] px-3 py-2 rounded-xl text-xs text-[var(--text-main)] group cursor-pointer hover:border-cyan-500 transition-all shrink-0"
                     >
-                        <Cpu size={14} className="text-cyan-500" />{m.name}
+                        <div className="flex items-center gap-2 hover:text-cyan-400" onClick={() => onMachineClick(m)}>
+                            <Cpu size={14} className="text-cyan-500 shrink-0" />
+                            <span className="truncate max-w-[150px]">{m.name}</span>
+                        </div>
+                        {onUpdate && (
+                            <button onClick={(e) => { e.stopPropagation(); handleUnassign(m.id); }} className="text-[var(--text-muted)] hover:text-rose-400 ml-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0 p-1" title="Quitar de este turno">
+                                <Minus size={14} />
+                            </button>
+                        )}
                     </div>
                 ))}
-                {shiftMachines.length === 0 && <p className="text-[var(--text-muted)] italic text-xs">{t('no_machines_this_shift')}</p>}
+                {(!shiftMachines || shiftMachines.length === 0) && !isAdding && <p className="text-[var(--text-muted)] italic text-xs w-full text-center py-2">{t('no_machines_this_shift')}</p>}
             </div>
         </div>
     );
@@ -1238,6 +1353,10 @@ const DataExplorer: React.FC = () => {
     const [erpSyncLoading, setErpSyncLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
+    // ─ Inline edit state ───────────────────────────────
+    const [editingRowId, setEditingRowId] = useState<string | null>(null);
+    const [editingValues, setEditingValues] = useState<Record<string, any>>({}); // snapshot of the row being edited
+
     // ─ Toast system ───────────────────────────────────────
     const [toasts, setToasts] = useState<Toast[]>([]);
     const showToast = useCallback((type: ToastType, title: string, message?: string) => {
@@ -1388,9 +1507,34 @@ const DataExplorer: React.FC = () => {
             const { data: result, error } = await query;
             if (error) throw error;
 
+            // ── BOM: agrupar por artículo padre (1 fila por padre, N componentes en expand) ──
+            if (subTab === 'bom') {
+                const parents = [...new Set((result || []).map((r: any) => r.parent_item_id))] as string[];
+                const grouped = parents.map(parentId => {
+                    const comps = (result || []).filter((r: any) => r.parent_item_id === parentId);
+                    const parentItem = allData.items.find((i: any) => i.id === parentId);
+                    return {
+                        id: parentId,
+                        parent_item_id: parentId,
+                        parent_name: parentItem?.name || parentId,
+                        component_count: comps.length,
+                    };
+                });
+                setData(grouped);
+                setLoading(false);
+                return;
+            }
+
             const flattened = (result || []).map((row: any) => {
                 const newRow = { ...row };
-                if (row.item) newRow.item = row.item.name;
+                // Compras ERP: reemplazar item_id con nombre resuelto, eliminar duplicado
+                if (subTab === 'erp_ppo' && row.item) {
+                    newRow.articulo = row.item.name; // nombre legible
+                    delete newRow.item_id;           // elimina columna duplicada
+                    delete newRow.item;              // elimina objeto anidado
+                } else if (row.item) {
+                    newRow.item = row.item.name;
+                }
 
                 // --- Cálculo de Saldo ---
                 if (subTab === 'work_orders') {
@@ -1458,6 +1602,107 @@ const DataExplorer: React.FC = () => {
         }
     };
 
+    // ── Inline edit: editable fields per sub-tab ──────────────────────
+    type EditFieldDef = { key: string; type: 'text' | 'number' | 'date' | 'time' | 'select'; options?: string[] };
+    const EDITABLE_FIELDS: Record<string, EditFieldDef[]> = {
+        work_orders: [
+            { key: 'item_id', type: 'select' },
+            { key: 'quantity_ordered', type: 'number' },
+            { key: 'quantity_completed', type: 'number' },
+            { key: 'due_date', type: 'date' },
+            { key: 'status', type: 'select', options: ['New', 'Planned', 'Released', 'Completed'] },
+            { key: 'priority', type: 'number' },
+        ],
+        routings: [
+            { key: 'operation_description', type: 'text' },
+            { key: 'work_center_id', type: 'select' },
+            { key: 'setup_time_minutes', type: 'number' },
+            { key: 'run_time_minutes_per_unit', type: 'number' },
+        ],
+        shifts: [
+            { key: 'name', type: 'text' },
+            { key: 'start_time', type: 'time' },
+            { key: 'end_time', type: 'time' },
+        ],
+        maintenance_plans: [
+            { key: 'title', type: 'text' },
+            { key: 'type', type: 'select', options: ['Preventive', 'Corrective'] },
+            { key: 'status', type: 'select', options: ['Scheduled', 'In Progress', 'Completed'] },
+            { key: 'start_date', type: 'date' },
+            { key: 'end_date', type: 'date' },
+            { key: 'machine_id', type: 'select' },
+        ],
+        work_centers: [
+            { key: 'name', type: 'text' },
+            { key: 'hours_per_shift', type: 'number' },
+            { key: 'number_of_shifts', type: 'number' },
+            { key: 'oee', type: 'number' },
+            { key: 'overlap_percentage', type: 'number' },
+        ],
+    };
+    const VIRTUAL_FIELDS: Record<string, string[]> = { work_orders: ['balance'], bom: ['parent_name', 'component_count'] };
+
+    const handleStartEdit = (row: any) => {
+        setEditingRowId(row.id);
+        setEditingValues({ ...row });
+    };
+    const handleCancelEdit = () => { setEditingRowId(null); setEditingValues({}); };
+    const handleSaveEdit = async () => {
+        try {
+            const tableName = tabs[activeTab].find(tab => tab.id === subTab)?.table || subTab;
+            const virtualFields = VIRTUAL_FIELDS[subTab] || [];
+            const payload = Object.fromEntries(
+                Object.entries(editingValues).filter(([k]) => k !== 'id' && !virtualFields.includes(k))
+            );
+            const { error } = await supabase.from(tableName).update(payload).eq('id', editingRowId);
+            if (error) throw error;
+            showToast('success', t('saved') || 'Guardado', t('record_updated') || 'Registro actualizado');
+            setEditingRowId(null);
+            setEditingValues({});
+            await fetchData();
+        } catch (e: any) { showToast('error', t('error_saving') || 'Error al guardar', e.message); }
+    };
+
+    // Helper: renders the correct input for a column in edit mode
+    const renderEditCell = (col: string) => {
+        const fieldDef = (EDITABLE_FIELDS[subTab] || []).find(f => f.key === col);
+        const inputCls = 'bg-[var(--bg-input)] border border-indigo-400 rounded-lg px-2 py-1 text-xs text-[var(--text-main)] outline-none focus:ring-2 focus:ring-indigo-400 w-full min-w-[80px]';
+        const val = editingValues[col] ?? '';
+        const setVal = (v: any) => setEditingValues(prev => ({ ...prev, [col]: v }));
+
+        if (!fieldDef) {
+            // Not editable: show as read-only text
+            return <span className="text-xs text-[var(--text-muted)] italic">{String(val ?? '-')}</span>;
+        }
+
+        if (fieldDef.type === 'number') {
+            return <input type="number" value={val} onChange={e => setVal(Number(e.target.value))} className={inputCls} />;
+        }
+        if (fieldDef.type === 'text') {
+            return <input type="text" value={val} onChange={e => setVal(e.target.value)} className={inputCls} />;
+        }
+        if (fieldDef.type === 'time') {
+            return <input type="time" value={String(val).substring(0, 5)} onChange={e => setVal(e.target.value)} className={inputCls} />;
+        }
+        if (fieldDef.type === 'date') {
+            const dateVal = val ? String(val).substring(0, 10) : '';
+            return <input type="date" value={dateVal} onChange={e => setVal(e.target.value)} className={inputCls} />;
+        }
+        if (fieldDef.type === 'select') {
+            let options: { value: string; label: string }[] = [];
+            if (col === 'item_id') options = allData.items.map(i => ({ value: i.id, label: i.name || i.id }));
+            else if (col === 'work_center_id') options = allData.workCenters.map(wc => ({ value: wc.id, label: wc.name || wc.id }));
+            else if (col === 'machine_id') options = allData.machines.map(m => ({ value: m.id, label: m.name || m.id }));
+            else options = (fieldDef.options || []).map(o => ({ value: o, label: o }));
+            return (
+                <select value={val} onChange={e => setVal(e.target.value)} className={inputCls}>
+                    {options.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                </select>
+            );
+        }
+        return <span>{String(val ?? '-')}</span>;
+    };
+
     const handleQuickCreate = async () => {
         setIsSaving(true);
         try {
@@ -1522,10 +1767,21 @@ const DataExplorer: React.FC = () => {
         if (data.length === 0) return [];
         const baseCols = Object.keys(data[0]).filter(c => !['id', 'scenario_id', 'created_at'].includes(c));
 
-        // Re-ordenar columnas para Demanda si es necesario
+        // Re-ordenar columnas para Demanda
         if (subTab === 'work_orders') {
             const order = ['item_id', 'quantity_ordered', 'quantity_completed', 'balance', 'due_date', 'status', 'priority'];
             return order.filter(c => baseCols.includes(c) || c === 'balance');
+        }
+
+        // BOM agrupado: columnas del objeto padre virtual
+        if (subTab === 'bom') {
+            return ['parent_item_id', 'parent_name', 'component_count'];
+        }
+
+        // Compras ERP: quita columnas ya resueltas/redundantes y pone articulo primero
+        if (subTab === 'erp_ppo') {
+            const filtered = baseCols.filter(c => !['item', 'item_id', 'articulo'].includes(c));
+            return ['articulo', ...filtered];
         }
 
         return baseCols;
@@ -1636,120 +1892,164 @@ const DataExplorer: React.FC = () => {
                                             <input type="text" placeholder={t('quick_search')} className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl py-2 pl-10 pr-4 text-[var(--text-main)] text-sm outline-none focus:border-indigo-500/50 transition-all font-bold" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                                         </div>
 
-                                        {activeTab === 'inputs' && (
-                                            <button
-                                                onClick={handleCreateRecord}
-                                                disabled={isSaving}
-                                                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500/20 transition-all"
-                                            >
-                                                {isSaving ? <RefreshCw size={14} className="animate-spin" /> : <Plus size={14} />}
-                                                {t('create_new')}
-                                            </button>
-                                        )}
+                                        <div className="flex items-center gap-3">
+                                            {/* Banner ERP solo lectura */}
+                                            {subTab === 'erp_ppo' && (
+                                                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-black uppercase tracking-widest">
+                                                    <Database size={12} /> {t('erp_readonly_label') || 'Solo lectura — datos del ERP'}
+                                                </div>
+                                            )}
+
+                                            {/* Botón Crear Nuevo solo para tabs editables (no ERP, no BOM) */}
+                                            {activeTab === 'inputs' && subTab !== 'erp_ppo' && subTab !== 'bom' && (
+                                                <button
+                                                    onClick={handleCreateRecord}
+                                                    disabled={isSaving}
+                                                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500/20 transition-all"
+                                                >
+                                                    {isSaving ? <RefreshCw size={14} className="animate-spin" /> : <Plus size={14} />}
+                                                    {t('create_new')}
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                     <div className="flex-1 overflow-auto custom-scrollbar">
-                                        <table className="w-full text-left border-collapse min-w-max relative">
+                                        <table className="w-full text-left border-collapse min-w-[800px] relative">
                                             <thead className="sticky top-0 z-10 bg-[var(--bg-sidebar)]">
                                                 <tr className="border-b border-[var(--border-color)] bg-[var(--bg-sidebar)]">
-                                                    {activeTab !== 'outputs' && subTab !== 'bom' && subTab !== 'routings' && <th className="px-6 py-4 text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest w-12 text-center bg-[var(--bg-sidebar)]">+/-</th>}
+                                                    {/* +/- expand: visible para bom y centres, invisible para erp_ppo, routings y work_orders (no tienen content en expand) */}
+                                                    {activeTab !== 'outputs' && subTab !== 'routings' && subTab !== 'erp_ppo' && subTab !== 'work_orders' && <th className="px-6 py-4 text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest w-12 text-center bg-[var(--bg-sidebar)]">+/-</th>}
                                                     {getColumns().map(col => (
                                                         <th key={col} className="px-6 py-4 text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest bg-[var(--bg-sidebar)]">
-                                                            {col === 'is_fixed' ? t('reprogrammable') : (t(col as any) !== col ? t(col as any) : col.replace(/_/g, ' '))}
+                                                            {col === 'is_fixed' ? t('reprogrammable') : col === 'component_count' ? t('components') || 'Componentes' : col === 'parent_name' ? t('name') || 'Nombre' : (t(col as any) !== col ? t(col as any) : col.replace(/_/g, ' '))}
                                                         </th>
                                                     ))}
-                                                    {activeTab === 'inputs' && <th className="px-6 py-4 text-[10px] font-black text-indigo-400 uppercase tracking-widest bg-[var(--bg-sidebar)] text-right">{t('actions')}</th>}
+                                                    {/* Acciones: solo para tabs editables, NO para erp_ppo ni bom */}
+                                                    {activeTab === 'inputs' && subTab !== 'erp_ppo' && subTab !== 'bom' && <th className="px-6 py-4 text-[10px] font-black text-indigo-400 uppercase tracking-widest bg-[var(--bg-sidebar)] text-right w-32 whitespace-nowrap">{t('actions')}</th>}
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-[var(--border-color)]/50">
-                                                {filteredData.map((row, idx) => (
-                                                    <React.Fragment key={row.id || idx}>
-                                                        <tr className="hover:bg-indigo-500/[0.02] transition-colors group">
-                                                            {activeTab !== 'outputs' && subTab !== 'bom' && subTab !== 'routings' && (
-                                                                <td className="px-6 py-4 text-center cursor-pointer" onClick={() => toggleRow(row.id)}>
-                                                                    {expandedRows[row.id] ? <Minus size={14} className="text-red-400 mx-auto" /> : <Plus size={14} className="text-indigo-400 mx-auto group-hover:scale-125 transition-transform" />}
-                                                                </td>
-                                                            )}
-                                                            {getColumns().map((col, vIdx) => (
-                                                                <td key={vIdx} className="px-6 py-4 text-sm text-[var(--text-muted)] group-hover:text-[var(--text-main)]">
-                                                                    {(col === 'name' || col === 'parent_item_id' || col === 'component_item_id' || col === 'item_id') ? (
-                                                                        <span
-                                                                            className="font-bold text-[var(--text-main)] cursor-pointer hover:text-indigo-400 hover:underline underline-offset-4"
-                                                                            onClick={() => handleArticleClick(row[col])}
-                                                                        >
-                                                                            {row[col]}
-                                                                        </span>
-                                                                    ) : col === 'is_fixed' ? (
-                                                                        <button
-                                                                            onClick={() => handleToggleFixed(row.id, row.is_fixed)}
-                                                                            className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase transition-all ${!row.is_fixed ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'}`}
-                                                                        >
-                                                                            {row[col] ? t('fixed_status') : t('flexible_status')}
-                                                                        </button>
-                                                                    ) : col === 'severity' || col === 'status' ? (
-                                                                        <div className="flex items-center gap-2">
-                                                                            <div className={`size-4 rounded-full shadow-lg ${String(row[col]).toLowerCase().includes('high') ||
-                                                                                String(row[col]).toLowerCase().includes('critical') ||
-                                                                                String(row[col]).toLowerCase().includes('red') ||
-                                                                                String(row[col]).toLowerCase().includes('retrag') ||
-                                                                                String(row[col]).toLowerCase().includes('crit') ? 'bg-rose-500 shadow-rose-500/40 border border-rose-400/30' :
-                                                                                String(row[col]).toLowerCase().includes('medium') ||
-                                                                                    String(row[col]).toLowerCase().includes('watch') ||
-                                                                                    String(row[col]).toLowerCase().includes('yellow') ||
-                                                                                    String(row[col]).toLowerCase().includes('warning') ||
-                                                                                    String(row[col]).toLowerCase().includes('aler') ? 'bg-amber-500 shadow-amber-500/40 border border-amber-400/30' :
-                                                                                    'bg-emerald-500 shadow-emerald-500/40 border border-emerald-400/30'
-                                                                                }`} title={row[col]} />
-                                                                        </div>
-                                                                    ) : col === 'balance' ? (
-                                                                        <span className="font-black text-indigo-400">
-                                                                            {row[col]}
-                                                                        </span>
-                                                                    ) : String(row[col] ?? '-')}
-                                                                </td>
-                                                            ))}
-                                                            {activeTab === 'inputs' && (
-                                                                <td className="px-6 py-4 text-right">
-                                                                    <div className="flex justify-end gap-2">
-                                                                        <button
-                                                                            onClick={(e) => { e.stopPropagation(); handleMainRowClick(row, subTab === 'items' ? 'name' : 'machines'); }}
-                                                                            className="p-2 text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-all"
-                                                                            title={t('edit_btn')}
-                                                                        >
-                                                                            <Edit2 size={16} />
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={(e) => { e.stopPropagation(); handleDeleteRecord(row.id); }}
-                                                                            className="p-2 text-rose-500 hover:bg-rose-500/10 rounded-lg transition-all"
-                                                                            title={t('delete_btn')}
-                                                                        >
-                                                                            <Trash2 size={16} />
-                                                                        </button>
-                                                                    </div>
-                                                                </td>
-                                                            )}
-                                                        </tr>
-                                                        {expandedRows[row.id] && (
-                                                            <tr>
-                                                                <td colSpan={getColumns().length + 1} className="bg-[var(--bg-main)]/80">
-                                                                    {(subTab === 'bom' || subTab === 'items') && (
-                                                                        <div className={`grid grid-cols-1 ${row.item_type === 'COMPRADO' ? '' : 'lg:grid-cols-2'} gap-4`}>
-                                                                            {row.item_type !== 'COMPRADO' && (
-                                                                                <BOMSubTable parentId={row.id} bom={allData.bom} items={allData.items} onItemClick={handleArticleClick} />
-                                                                            )}
-                                                                            <WhereUsedSubTable itemId={row.id} bom={allData.bom} items={allData.items} onItemClick={handleArticleClick} />
-                                                                        </div>
-                                                                    )}
-                                                                    {subTab === 'work_centers' && <MachineSubTable wcId={row.id} machines={allData.machines} onMachineClick={handleMachineClick} onAddMachine={handleAddMachineToWC} />}
-                                                                    {subTab === 'routings' && <RoutingSubTable itemId={row.id} routings={allData.routings} />}
-                                                                    {subTab === 'work_orders' && <OrderDetailsSubTable order={row} bom={allData.bom} items={allData.items} routings={allData.routings} onItemClick={handleArticleClick} />}
+                                                {filteredData.map((row, idx) => {
+                                                    const isEditing = editingRowId === row.id;
+                                                    return (
+                                                        <React.Fragment key={row.id || idx}>
+                                                            <tr className={`transition-all group ${isEditing ? 'bg-indigo-500/[0.07] border-l-[3px] border-l-indigo-400' : 'hover:bg-indigo-500/[0.02]'}`}>
+                                                                {activeTab !== 'outputs' && subTab !== 'routings' && subTab !== 'erp_ppo' && subTab !== 'work_orders' && (
+                                                                    <td className="px-6 py-4 text-center cursor-pointer" onClick={() => toggleRow(row.id)}>
+                                                                        {expandedRows[row.id] ? <Minus size={14} className="text-red-400 mx-auto" /> : <Plus size={14} className="text-indigo-400 mx-auto group-hover:scale-125 transition-transform" />}
+                                                                    </td>
+                                                                )}
 
-                                                                    {subTab === 'shifts' && <ShiftDetailsSubTable shiftId={row.id} machines={allData.machines} onMachineClick={handleMachineClick} />}
-                                                                    {subTab === 'maintenance_plans' && <MaintenanceDetailsSubTable plan={row} machines={allData.machines} onMachineClick={handleMachineClick} />}
-                                                                </td>
+                                                                {getColumns().map((col, vIdx) => (
+                                                                    <td key={vIdx} className={`px-6 ${isEditing ? 'py-2' : 'py-4'} text-sm text-[var(--text-muted)] group-hover:text-[var(--text-main)] transition-colors`}>
+                                                                        {isEditing ? (
+                                                                            renderEditCell(col)
+                                                                        ) : (
+                                                                            col === 'name' && subTab === 'items' ? (
+                                                                                <span className="font-bold text-[var(--text-main)] cursor-pointer hover:text-indigo-400 hover:underline underline-offset-4" onClick={() => handleArticleClick(row[col])}>{row[col]}</span>
+                                                                            ) : (col === 'parent_item_id' || col === 'component_item_id') ? (
+                                                                                <span className="font-bold text-[var(--text-main)]">{row[col]}</span>
+                                                                            ) : col === 'is_fixed' ? (
+                                                                                <button onClick={() => handleToggleFixed(row.id, row.is_fixed)}
+                                                                                    className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase transition-all ${!row.is_fixed ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'}`}>
+                                                                                    {row[col] ? t('fixed_status') : t('flexible_status')}
+                                                                                </button>
+                                                                            ) : col === 'severity' || col === 'status' ? (
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <div className={`size-3 rounded-full flex-shrink-0 shadow-lg ${String(row[col]).toLowerCase().match(/high|critical|red|crit|retrag/) ? 'bg-rose-500 shadow-rose-500/40' :
+                                                                                        String(row[col]).toLowerCase().match(/medium|watch|yellow|warning|aler/) ? 'bg-amber-500 shadow-amber-500/40' :
+                                                                                            'bg-emerald-500 shadow-emerald-500/40'
+                                                                                        }`} />
+                                                                                    <span className="text-xs">{row[col]}</span>
+                                                                                </div>
+                                                                            ) : col === 'balance' ? (
+                                                                                <span className="font-black text-indigo-400">{row[col]}</span>
+                                                                            ) : (
+                                                                                <span>{String(row[col] ?? '-')}</span>
+                                                                            )
+                                                                        )}
+                                                                    </td>
+                                                                ))}
+                                                                {/* Acciones: excluidas para erp_ppo (solo lectura) y bom (edición vía Artículos) */}
+                                                                {activeTab === 'inputs' && subTab !== 'erp_ppo' && subTab !== 'bom' && (
+                                                                    <td className="px-6 py-4 text-right w-32 whitespace-nowrap">
+                                                                        <div className="flex justify-end gap-2 items-center">
+                                                                            {isEditing ? (
+                                                                                <>
+                                                                                    <button onClick={(e) => { e.stopPropagation(); handleSaveEdit(); }}
+                                                                                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-[10px] font-black uppercase hover:bg-emerald-500/30 transition-all">
+                                                                                        <Check size={12} /> Guardar
+                                                                                    </button>
+                                                                                    <button onClick={(e) => { e.stopPropagation(); handleCancelEdit(); }}
+                                                                                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-muted)] text-[10px] font-black uppercase hover:border-rose-500/40 hover:text-rose-400 transition-all">
+                                                                                        <X size={12} /> Cancelar
+                                                                                    </button>
+                                                                                </>
+                                                                            ) : (
+                                                                                <>
+                                                                                    <button
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            if (subTab === 'items') handleMainRowClick(row, 'name');
+                                                                                            else handleStartEdit(row);
+                                                                                        }}
+                                                                                        className="p-2 text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-all"
+                                                                                        title={t('edit_btn')}
+                                                                                    >
+                                                                                        <Edit2 size={16} />
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={(e) => { e.stopPropagation(); handleDeleteRecord(row.id); }}
+                                                                                        className="p-2 text-rose-500 hover:bg-rose-500/10 rounded-lg transition-all"
+                                                                                        title={t('delete_btn')}
+                                                                                    >
+                                                                                        <Trash2 size={16} />
+                                                                                    </button>
+                                                                                </>
+                                                                            )}
+                                                                        </div>
+                                                                    </td>
+                                                                )}
                                                             </tr>
-                                                        )}
-                                                    </React.Fragment>
-                                                ))}
+
+                                                            {/* Edit mode indicator strip (aviso explícito debajo de la fila que se está editando) */}
+                                                            {isEditing && (
+                                                                <tr className="bg-indigo-500/5 border-l-[3px] border-l-indigo-400">
+                                                                    <td colSpan={getColumns().length + 2} className="px-8 py-1.5">
+                                                                        <div className="flex items-center gap-2 text-indigo-400 text-[9px] font-black uppercase tracking-[0.15em]">
+                                                                            <Edit2 size={9} className="animate-pulse" />
+                                                                            <span>MODO EDICIÓN — modificá los campos editables y presioná GUARDAR</span>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            )}
+
+                                                            {expandedRows[row.id] && !isEditing && (
+                                                                <tr>
+                                                                    <td colSpan={getColumns().length + 2} className="bg-[var(--bg-main)]/80">
+                                                                        {/* BOM agrupado: expand muestra sub-tabla de componentes de este padre */}
+                                                                        {subTab === 'bom' && (
+                                                                            <BOMSubTable parentId={row.parent_item_id} bom={allData.bom} items={allData.items} onItemClick={handleArticleClick} onUpdate={async () => { await fetchData(); await fetchAll(); }} />
+                                                                        )}
+                                                                        {/* Artículos: expand muestra componentes propios + dónde se usa */}
+                                                                        {subTab === 'items' && (
+                                                                            <div className={`grid grid-cols-1 ${row.item_type === 'COMPRADO' ? '' : 'lg:grid-cols-2'} gap-4`}>
+                                                                                {row.item_type !== 'COMPRADO' && (
+                                                                                    <BOMSubTable parentId={row.id} bom={allData.bom} items={allData.items} onItemClick={handleArticleClick} onUpdate={async () => { await fetchData(); await fetchAll(); }} />
+                                                                                )}
+                                                                                <WhereUsedSubTable itemId={row.id} bom={allData.bom} items={allData.items} onItemClick={handleArticleClick} />
+                                                                            </div>
+                                                                        )}
+                                                                        {subTab === 'work_centers' && <MachineSubTable wcId={row.id} machines={allData.machines} onMachineClick={handleMachineClick} onAddMachine={handleAddMachineToWC} />}
+                                                                        {subTab === 'routings' && <RoutingSubTable itemId={row.id} routings={allData.routings} />}
+                                                                        {subTab === 'shifts' && <ShiftDetailsSubTable shiftId={row.id} machines={allData.machines} onMachineClick={() => { }} onUpdate={async () => { await fetchData(); await fetchAll(); }} />}
+                                                                        {subTab === 'maintenance_plans' && <MaintenanceDetailsSubTable plan={row} machines={allData.machines} onMachineClick={() => { }} />}
+                                                                    </td>
+                                                                </tr>
+                                                            )}
+                                                        </React.Fragment>
+                                                    );
+                                                })}
                                             </tbody>
                                         </table>
                                     </div>
