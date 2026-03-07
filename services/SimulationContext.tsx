@@ -9,6 +9,8 @@ interface SimulationContextType {
     loadingScenarios: boolean;
     refreshScenarios: () => Promise<void>;
     deleteScenarios: (ids: string[]) => Promise<void>;
+    capacityHorizon: number;
+    setCapacityHorizon: (val: number) => void;
 }
 
 const SimulationContext = createContext<SimulationContextType | undefined>(undefined);
@@ -16,6 +18,10 @@ const SimulationContext = createContext<SimulationContextType | undefined>(undef
 export const SimulationProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [selectedScenarioId, setSelectedScenarioId] = useState<string | null>(() => {
         return localStorage.getItem('selectedScenarioId');
+    });
+    const [capacityHorizon, setCapacityHorizon] = useState<number>(() => {
+        const stored = localStorage.getItem('capacityHorizon');
+        return stored ? parseInt(stored, 10) : 30;
     });
     const [scenarios, setScenarios] = useState<any[]>([]);
     const [loadingScenarios, setLoadingScenarios] = useState(true);
@@ -57,6 +63,10 @@ export const SimulationProvider: React.FC<{ children: ReactNode }> = ({ children
         }
     }, [selectedScenarioId]);
 
+    useEffect(() => {
+        localStorage.setItem('capacityHorizon', capacityHorizon.toString());
+    }, [capacityHorizon]);
+
     const deleteScenarios = async (ids: string[]) => {
         if (ids.length === 0) return;
         try {
@@ -79,7 +89,9 @@ export const SimulationProvider: React.FC<{ children: ReactNode }> = ({ children
             scenarios,
             loadingScenarios,
             refreshScenarios,
-            deleteScenarios
+            deleteScenarios,
+            capacityHorizon,
+            setCapacityHorizon
         }}>
             {children}
         </SimulationContext.Provider>

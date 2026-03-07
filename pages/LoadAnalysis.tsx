@@ -32,7 +32,7 @@ const calculateCapacityForPeriod = (start: Date, end: Date, machine: any): numbe
 
 const LoadAnalysisPage: React.FC = () => {
   const { t } = useTranslation();
-  const { selectedScenarioId } = useSimulation();
+  const { selectedScenarioId, capacityHorizon, setCapacityHorizon } = useSimulation();
   const [wcLoads, setWcLoads] = useState<any[]>([]);
   const [buffers, setBuffers] = useState<any[]>([]);
   const [tocStatus, setTocStatus] = useState({ drum: '', buffer: 0, rope: 'Sync' });
@@ -42,7 +42,7 @@ const LoadAnalysisPage: React.FC = () => {
       fetchWorkCenterLoads(selectedScenarioId);
       fetchBuffers();
     }
-  }, [selectedScenarioId]);
+  }, [selectedScenarioId, capacityHorizon]);
 
   const fetchWorkCenterLoads = async (scenarioId: string) => {
     try {
@@ -54,16 +54,8 @@ const LoadAnalysisPage: React.FC = () => {
       if (wcs && ops && scenario && allMachines) {
         const overrides = scenario.simulation_overrides?.machine_counts || {};
 
-        // ── Horizonte real del escenario ─────────────────────────────────────
-        // Usamos el rango real de start_date / end_date de las operaciones,
-        // no una ventana fija de 30 días que subestima la capacidad.
-        const allDates = ops.flatMap((o: any) => [
-          o.start_date ? new Date(o.start_date).getTime() : null,
-          o.end_date ? new Date(o.end_date).getTime() : null,
-        ]).filter(Boolean) as number[];
-
-        const horizonStart = allDates.length > 0 ? new Date(Math.min(...allDates)) : new Date();
-        const horizonEnd = allDates.length > 0 ? new Date(Math.max(...allDates)) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        // Use dynamic horizon from context
+        const horizonDays = capacityHorizon;
 
         const loads = wcs.map((wc: any) => {
           const wcOps = ops.filter((o: any) => o.work_center_id === wc.id);
@@ -73,12 +65,20 @@ const LoadAnalysisPage: React.FC = () => {
           const overrideCount = overrides[wc.id];
           const machineCount = overrideCount !== undefined ? Number(overrideCount) : dbMachines.length;
 
-          // Capacidad usando el horizonte real del escenario
-          const baseCapacity = dbMachines.length > 0
-            ? dbMachines.reduce((acc: number, m: any) => acc + calculateCapacityForPeriod(horizonStart, horizonEnd, m), 0) / dbMachines.length
-            : 8 * 60 * 30;
+          // Per-machine capacity: use shift hours if available, matching Simulation.tsx exactly
+          const perMachineCapacity = (m: any): number => {
+            const shift = m?.shift;
+            if (!shift) return 8 * 60 * horizonDays * (5 / 7); // default 8h × 5/7 working days
+            const [sh, sm] = (shift.start_time || '08:00').split(':').map(Number);
+            const [eh, em] = (shift.end_time || '16:00').split(':').map(Number);
+            const hoursPerDay = Math.max(0, (eh * 60 + em - (sh * 60 + sm)) / 60);
+            const daysPerWeek = shift.days_of_week?.length ?? 5;
+            return hoursPerDay * 60 * horizonDays * (daysPerWeek / 7);
+          };
 
-          const totalCapacityMinutes = baseCapacity * machineCount;
+          const totalCapacityMinutes = dbMachines.length > 0
+            ? dbMachines.reduce((acc: number, m: any) => acc + perMachineCapacity(m), 0) / dbMachines.length * machineCount
+            : 8 * 60 * horizonDays * (5 / 7) * machineCount;
 
           const loadPercent = totalCapacityMinutes > 0 ? Math.round((totalRunTime / totalCapacityMinutes) * 100) : 0;
 
@@ -87,7 +87,7 @@ const LoadAnalysisPage: React.FC = () => {
             name: wc.name,
             load: loadPercent,
             totalMinutes: totalRunTime,
-            color: loadPercent > 95 ? 'bg-rose-500 shadow-rose-500/20' : loadPercent > 80 ? 'bg-amber-500 shadow-amber-500/20' : 'bg-indigo-600 shadow-indigo-600/20',
+            color: loadPercent > 85 ? 'bg-rose-500 shadow-rose-500/20' : loadPercent > 70 ? 'bg-amber-500 shadow-amber-500/20' : 'bg-indigo-600 shadow-indigo-600/20',
             drum: false
           };
         });
@@ -103,7 +103,7 @@ const LoadAnalysisPage: React.FC = () => {
           setTocStatus({
             drum: drumWc.name,
             buffer: bufferHours,
-            rope: drumWc.load > 90 ? t('high_tension') : t('pulling')
+            rope: drumWc.load > 85 ? t('high_tension') : t('pulling')
           });
         }
 
@@ -213,14 +213,28 @@ const LoadAnalysisPage: React.FC = () => {
                       <Activity className="text-indigo-500" size={20} />
                       {t('wc_loading')}
                     </h3>
-                    <p className="text-[var(--text-muted)] text-[10px] font-bold uppercase tracking-widest opacity-60">{t('finite_vs_projected')}</p>
+                    <p className="text-[var(--text-muted)] text-[10px] font-bold uppercase tracking-widest opacity-60 flex items-center gap-2">
+                      {t('finite_vs_projected')} · (Proyección {capacityHorizon} Días)
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-[7px] font-bold text-indigo-400 uppercase tracking-widest">Horizonte:</p>
+                    <select
+                      value={capacityHorizon}
+                      onChange={e => setCapacityHorizon(parseInt(e.target.value, 10))}
+                      className="bg-[var(--bg-card)] border border-[var(--border-color)] text-indigo-400 text-[8px] font-black uppercase rounded p-1 outline-none focus:border-indigo-500 cursor-pointer"
+                    >
+                      {[15, 30, 45, 60, 90].map(val => (
+                        <option key={val} value={val}>{val} Días</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
                 <div className="flex-1 flex items-end justify-between gap-4 relative px-6 pb-16 mt-4 min-h-0 overflow-hidden">
-                  {/* OVERLOAD LINE - High Z-index and neutral color to avoid being covered by red bars */}
-                  <div className="absolute left-0 right-0 bottom-[80%] h-px border-t border-dashed border-indigo-500/40 flex items-center z-30 pointer-events-none">
-                    <div className="px-2 py-0.5 bg-indigo-500/10 backdrop-blur-md border border-indigo-500/40 rounded text-[7px] font-black text-indigo-500 absolute left-2 -translate-y-1/2 uppercase tracking-widest whitespace-nowrap shadow-md">
+                  {/* OVERLOAD LIMIT LINE (matched to 85% Saturation Threshold) */}
+                  <div className="absolute left-0 right-0 bottom-[85%] h-px border-t border-dashed border-rose-500/40 flex items-center z-30 pointer-events-none">
+                    <div className="px-2 py-0.5 bg-rose-500/10 backdrop-blur-md border border-rose-500/40 rounded text-[7px] font-black text-rose-500 absolute left-2 -translate-y-1/2 uppercase tracking-widest whitespace-nowrap shadow-md">
                       {t('overload_limit')}
                     </div>
                   </div>
@@ -249,7 +263,7 @@ const LoadAnalysisPage: React.FC = () => {
                           <p className={`text-[8px] font-black uppercase tracking-tighter leading-tight overflow-hidden ${wc.drum ? 'text-rose-500' : 'text-[var(--text-main)]'}`} style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                             {wc.name}
                           </p>
-                          <p className={`text-[10px] font-bold font-mono mt-0.5 ${wc.load > 80 ? 'text-rose-500' : 'text-indigo-500 opacity-60'}`}>
+                          <p className={`text-[10px] font-bold font-mono mt-0.5 ${wc.load > 85 ? 'text-rose-500' : 'text-indigo-500 opacity-60'}`}>
                             {wc.load}%
                           </p>
                         </div>

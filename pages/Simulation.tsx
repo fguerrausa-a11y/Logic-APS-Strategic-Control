@@ -157,7 +157,7 @@ const SATURATION_THRESHOLD = 85; // %
 const SimulationPage: React.FC = () => {
   const { t, language } = useTranslation();
   const navigate = useNavigate();
-  const { scenarios, selectedScenarioId, setSelectedScenarioId, refreshScenarios } = useSimulation();
+  const { scenarios, selectedScenarioId, setSelectedScenarioId, refreshScenarios, capacityHorizon, setCapacityHorizon } = useSimulation();
 
   const [activeScenario, setActiveScenario] = useState<any>(null);
   const [isExecuting, setIsExecuting] = useState(false);
@@ -386,9 +386,7 @@ const SimulationPage: React.FC = () => {
   // ─────────────────────────────────────────────────────────────────────
   const wcLoadMap = React.useMemo(() => {
     const map: Record<string, { loadPct: number; loadMinutes: number; capacityMinutes: number; machineCount: number }> = {};
-    const dtFrom = new Date(filters.fromDate || new Date());
-    const dtTo = new Date(filters.toDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
-    const horizonDays = Math.max(1, Math.round((dtTo.getTime() - dtFrom.getTime()) / 86400000));
+    const horizonDays = capacityHorizon; // Dynamically pull from context
 
     workCenters.forEach(wc => {
       const wcOps = proposedOperations.filter(op => op.work_center_id === wc.id);
@@ -419,7 +417,7 @@ const SimulationPage: React.FC = () => {
       map[wc.id] = { loadPct, loadMinutes, capacityMinutes: Math.round(totalCapacityMinutes), machineCount };
     });
     return map;
-  }, [workCenters, proposedOperations, scenarioMachinesData, virtualMachines, filters.fromDate, filters.toDate]);
+  }, [workCenters, proposedOperations, scenarioMachinesData, virtualMachines, capacityHorizon]);
 
   return (
     <div className="flex h-full overflow-hidden bg-[var(--bg-main)] text-[var(--text-main)] transition-colors">
@@ -466,8 +464,9 @@ const SimulationPage: React.FC = () => {
                   <div className={`w-3 h-3 rounded-full ${overlapEnabled ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-700'}`}></div>
                 </div>
                 <div className="space-y-2">
-                  <p className="text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest px-1">{t('deadline')}</p>
+                  <p className="text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest px-1">Límite Entregas (Demand Cut-off)</p>
                   <input type="date" value={filters.toDate} onChange={e => setFilters({ ...filters, toDate: e.target.value })} className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl p-3 text-xs font-bold outline-none focus:border-indigo-500" />
+                  <p className="text-[8px] font-bold text-[var(--text-muted)] px-1 leading-tight">Simula únicamente órdenes con entrega exigida antes de esta fecha.</p>
                 </div>
                 <div onClick={() => setShowOrderPicker(true)} className="p-4 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-2xl cursor-pointer hover:border-indigo-500/50 transition-all flex justify-between items-center group">
                   <div>
@@ -481,9 +480,23 @@ const SimulationPage: React.FC = () => {
 
             <section className="space-y-6">
               <div className="flex items-center justify-between border-b border-[var(--border-color)] pb-2 mb-2">
-                <h3 className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest flex items-center gap-2">
-                  <Cpu size={14} /> {t('installed_capacity')}
-                </h3>
+                <div>
+                  <h3 className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest flex items-center gap-2 mb-1">
+                    <Cpu size={14} /> {t('installed_capacity')}
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <p className="text-[7px] font-bold text-indigo-400 uppercase tracking-widest">Horizonte:</p>
+                    <select
+                      value={capacityHorizon}
+                      onChange={e => setCapacityHorizon(parseInt(e.target.value, 10))}
+                      className="bg-[var(--bg-input)] border border-[var(--border-color)] text-indigo-400 text-[8px] font-black uppercase rounded p-0.5 outline-none focus:border-indigo-500 cursor-pointer"
+                    >
+                      {[15, 30, 45, 60, 90].map(val => (
+                        <option key={val} value={val}>{val} Días</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
                 {!isRealCapacity && (
                   <button
                     onClick={handleResetToReal}
@@ -583,7 +596,7 @@ const SimulationPage: React.FC = () => {
                   <div className="flex items-center justify-between border-b border-[var(--border-color)] pb-6">
                     <div>
                       <h3 className="text-2xl font-black uppercase tracking-tighter">{t('work_center_load')}</h3>
-                      <p className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-[0.2em] mt-1">{t('saturation_analysis')}</p>
+                      <p className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-[0.2em] mt-1">{t('saturation_analysis')} · (Proyección {capacityHorizon} Días)</p>
                     </div>
                     <div className="p-4 bg-indigo-500/10 rounded-2xl text-indigo-500 border border-indigo-500/20">
                       <Cpu size={28} />
@@ -623,7 +636,7 @@ const SimulationPage: React.FC = () => {
                                 </p>
                                 <p className="text-[9px] font-medium text-[var(--text-muted)] flex items-center gap-1 mt-1">
                                   <Calendar size={10} className="text-indigo-400/60" />
-                                  {dtFrom.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} - {dtTo.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                                  {capacityHorizon} Días Calendario
                                 </p>
                               </div>
                               <span className={`text-lg font-black ${isHighLoad ? 'text-rose-500' : isDanger ? 'text-amber-500' : 'text-emerald-500'}`}>
